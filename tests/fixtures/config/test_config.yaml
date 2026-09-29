@@ -1,0 +1,49 @@
+# Test Configuration for Audi A6 C5 Monitoring Service
+database:
+  url: "sqlite+aiosqlite:///:memory:"
+  echo: false
+  pool_size: 5
+
+telegram:
+  bot_token: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+  chat_id: "-1001234567890"
+  rate_limit_delay_seconds: 1.2
+  max_retries: 3
+  flood_wait_multiplier: 1.5
+
+sources:
+  auto_ria:
+    enabled: true
+    rate_limit_per_min: 20
+    base_url: "https://auto.ria.com/uk/car/audi/a6/"
+  olx:
+    enabled: true
+    rate_limit_per_min: 25
+    base_url: "https://www.olx.ua/d/uk/transport/legkovye-avtomobili/audi/a6/"
+  rst:
+    enabled: true
+    rate_limit_per_min: 20
+    base_url: "https://rst.ua/ukr/oldcars/audi/a6/"
+  telegram:
+    enabled: true
+    api_id: 1234567
+    api_hash: "0123456789abcdef0123456789abcdef"
+    session_string: "test_telethon_session_string"
+    channels:
+      - "@autobazar_ukraine"
+      - "@avtobazar_kiev"
+  instagram:
+    enabled: true
+    accounts:
+      - "autopodbor_ua"
+      - "autodeal_kyiv"
+
+filter:
+  target_model: "A6"
+  target_generation: "C5"
+  min_year: 1997
+  max_year: 2005
+  target_engines:
+    - "1.8T"
+    - "2.4"
+    - "1.9_TDI"

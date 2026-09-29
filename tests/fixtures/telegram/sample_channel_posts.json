@@ -1,0 +1,42 @@
+[
+  {
+    "id": 10421,
+    "channel": "autobazar_ukraine",
+    "message": "🔥 У продажу Audi A6 C5 2002 1.8T газ/бензин\n\nРік: 2002\nДвигун: 1.8 Turbo (газ/бензин)\nКоробка: Механіка\nПробіг: 275 тис. км\nМісто: Львів\nЦіна: 4 300 $\n\nАвтомобіль в ідеальному стані, ходова зроблена, турбіна дує добре.\nКонтакт: +380671234567\n#audi #a6 #c5 #львів",
+    "date": "2026-09-28T14:30:00+00:00",
+    "grouped_id": 9988776611,
+    "media_photo": true,
+    "photo_urls": [
+      "https://api.telegram.org/file/bot123/photos/file_1.jpg",
+      "https://api.telegram.org/file/bot123/photos/file_2.jpg",
+      "https://api.telegram.org/file/bot123/photos/file_3.jpg"
+    ]
+  },
+  {
+    "id": 10422,
+    "channel": "autobazar_ukraine",
+    "message": "",
+    "date": "2026-09-28T14:30:01+00:00",
+    "grouped_id": 9988776611,
+    "media_photo": true,
+    "photo_urls": ["https://api.telegram.org/file/bot123/photos/file_2.jpg"]
+  },
+  {
+    "id": 10425,
+    "channel": "autobazar_ukraine",
+    "message": "Audi A6 1.9 TDI 2003 універсал\nЦіна 4800$\nМісто: Тернопіль\nПробіг: 315 тис\nДвигун 1.9 тді 96квт\nКоробка 6-ступка\nТел: 0987654321",
+    "date": "2026-09-28T15:10:00+00:00",
+    "grouped_id": null,
+    "media_photo": true,
+    "photo_urls": ["https://api.telegram.org/file/bot123/photos/file_single.jpg"]
+  },
+  {
+    "id": 10426,
+    "channel": "autobazar_ukraine",
+    "message": "Куплю Audi A6 C5 1.9 TDI або 1.8Т для себе, бюджет до 4000$. Пишіть у приватні повідомлення.",
+    "date": "2026-09-28T15:45:00+00:00",
+    "grouped_id": null,
+    "media_photo": false,
+    "photo_urls": []
+  }
+]

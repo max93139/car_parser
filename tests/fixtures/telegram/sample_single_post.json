@@ -1,0 +1,12 @@
+{
+  "id": 10425,
+  "channel": "autobazar_ukraine",
+  "url": "https://t.me/autobazar_ukraine/10425",
+  "message": "Audi A6 1.9 TDI 2003 універсал\nЦіна: 4800 $\nМісто: Тернопіль\nПробіг: 315 тис. км\nДвигун: 1.9 TDI (96 kW / 130 к.с.)\nКоробка: 6-ступка механіка\nТел: +380987654321",
+  "date": "2026-09-28T15:10:00+00:00",
+  "grouped_id": null,
+  "photo_urls": [
+    "https://api.telegram.org/file/bot123/photos/file_single_1.jpg",
+    "https://api.telegram.org/file/bot123/photos/file_single_2.jpg"
+  ]
+}

@@ -1,0 +1,79 @@
+app:
+  env: "production"
+  debug: false
+  log_level: "INFO"
+  timezone: "Europe/Kyiv"
+
+search:
+  brand: "Audi"
+  model: "A6"
+  generation: "C5"
+  min_year: 1997
+  max_year: 2005
+  target_engines:
+    - code: "1.8T"
+      displacement: 1.8
+      fuel: "petrol"
+      turbo: true
+    - code: "2.4"
+      displacement: 2.4
+      fuel: ["petrol", "lpg"]
+      turbo: false
+    - code: "1.9TDI"
+      displacement: 1.9
+      fuel: "diesel"
+      turbo: true
+
+database:
+  url: "postgresql+asyncpg://postgres:postgres@localhost:5432/car_db"
+  pool_size: 5
+  max_overflow: 10
+  pool_timeout: 30.0
+
+parsers:
+  auto_ria:
+    enabled: true
+    request_delay: 1.5
+    timeout: 15.0
+    max_pages: 3
+  olx:
+    enabled: true
+    request_delay: 2.0
+    timeout: 20.0
+    max_pages: 3
+  rst:
+    enabled: true
+    request_delay: 1.2
+    timeout: 15.0
+    max_pages: 2
+  telegram:
+    enabled: true
+    api_id: null
+    api_hash: null
+    session_string: null
+    channels:
+      - "@autobazar_ua"
+      - "@autopoisk_ua"
+      - "@audi_club_ua"
+      - "@avtobazar_ukraine"
+    max_messages_per_channel: 30
+  instagram:
+    enabled: true
+    session_cookie: null
+    accounts:
+      - "autopodbor_ua"
+      - "avto_germany_ua"
+      - "audi_hub_ua"
+    max_posts_per_account: 12
+
+telegram_bot:
+  bot_token: ""
+  chat_id: ""
+  max_photos_per_album: 10
+  rate_limit_delay: 1.2
+  send_needs_review: true
+
+runner:
+  concurrency_limit: 3
+  dry_run: false
+  deduplication_enabled: true

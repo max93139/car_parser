@@ -1,0 +1,64 @@
+{
+  "data": {
+    "user": {
+      "username": "autopodbor_ua",
+      "full_name": "Автопідбір Україна",
+      "edge_owner_to_timeline_media": {
+        "count": 120,
+        "edges": [
+          {
+            "node": {
+              "id": "2837491029384756",
+              "shortcode": "C89X12345",
+              "display_url": "https://instagram.fiev22-1.fna.fbcdn.net/v/t51.2885-15/c89x1.jpg",
+              "edge_media_to_caption": {
+                "edges": [
+                  {
+                    "node": {
+                      "text": "Audi A6 C5 2001 рік 2.4 газ/бензин на автоматі! 🔥\nЦіна 4200$, рідна фарба, клімат заправлений, салон охайний.\nм. Київ, деталі в Direct або за тел: 0501112233.\n#audi #a6c5 #автокиїв #автобазар"
+                    }
+                  }
+                ]
+              },
+              "taken_at_timestamp": 1727524800
+            }
+          },
+          {
+            "node": {
+              "id": "2837491029384757",
+              "shortcode": "C89X12346",
+              "display_url": "https://instagram.fiev22-1.fna.fbcdn.net/v/t51.2885-15/c89x2.jpg",
+              "edge_media_to_caption": {
+                "edges": [
+                  {
+                    "node": {
+                      "text": "Audi A6 C5 1.9 TDI 2004 року 130 к.с. Універсал! 🚘\nПробіг 295 тис. км. Свіжопригнана, ціна 5100$ з торгом. Луцьк.\n#audia6 #19tdi"
+                    }
+                  }
+                ]
+              },
+              "taken_at_timestamp": 1727521200
+            }
+          },
+          {
+            "node": {
+              "id": "2837491029384758",
+              "shortcode": "C89X12347",
+              "display_url": "https://instagram.fiev22-1.fna.fbcdn.net/v/t51.2885-15/c89x3.jpg",
+              "edge_media_to_caption": {
+                "edges": [
+                  {
+                    "node": {
+                      "text": "Автопідбір під ключ з Європи! Пригон будь-якого авто за 5 днів. Телефонуйте!"
+                    }
+                  }
+                ]
+              },
+              "taken_at_timestamp": 1727517600
+            }
+          }
+        ]
+      }
+    }
+  }
+}

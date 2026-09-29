@@ -1,0 +1,79 @@
+{
+  "listing": {
+    "listing": {
+      "ads": [
+        {
+          "id": 829104812,
+          "url": "https://www.olx.ua/d/uk/obyavlenie/audi-a6-c5-1-9-tdi-2003-unversal-awx-ID829104812.html",
+          "title": "Audi A6 C5 1.9 TDI 2003 універсал AWX 96kW",
+          "description": "Продам надійний автомобіль Audi A6 C5 2003 року випуску, двигун 1.9 TDI 96kW (130 к.с.) насос-форсунка. Коробка 6-ступка механіка. Машина в дуже доброму стані, економна, розхід 5.5л по трасі. Нові колодки, замінено масло.",
+          "price": {
+            "value": 4500,
+            "currency": "USD"
+          },
+          "params": [
+            {"key": "model", "value": {"label": "A6"}},
+            {"key": "year", "value": {"label": "2003"}},
+            {"key": "fuel_type", "value": {"label": "Дизель"}},
+            {"key": "engine_capacity", "value": {"label": "1.9"}},
+            {"key": "milage", "value": {"label": "320000"}},
+            {"key": "transmission", "value": {"label": "Механічна"}}
+          ],
+          "photos": [
+            {"link": "https://ireland.apollo.olxcdn.com/v1/files/olx_photo_1/image;s={width}x{height}"},
+            {"link": "https://ireland.apollo.olxcdn.com/v1/files/olx_photo_2/image;s={width}x{height}"}
+          ],
+          "location": {
+            "city": {"name": "Луцьк"}
+          },
+          "created_time": "2026-09-28T18:30:00+03:00"
+        },
+        {
+          "id": 829104813,
+          "url": "https://www.olx.ua/d/uk/obyavlenie/audi-a6-4b-1-8-turbo-2000-gaz-benzin-ID829104813.html",
+          "title": "Audi A6 4B 1.8 Turbo 2000 газ/бензин",
+          "description": "Audi A6 C5 (4B) 2000 року, мотор 1.8Т працює рівно як на газу, так і на бензині. Встановлено дороге ГБО 4 покоління. Ходова в порядку.",
+          "price": {
+            "value": 3900,
+            "currency": "USD"
+          },
+          "params": [
+            {"key": "model", "value": {"label": "A6"}},
+            {"key": "year", "value": {"label": "2000"}},
+            {"key": "fuel_type", "value": {"label": "Газ / бензин"}},
+            {"key": "engine_capacity", "value": {"label": "1.8"}},
+            {"key": "milage", "value": {"label": "290000"}},
+            {"key": "transmission", "value": {"label": "Механічна"}}
+          ],
+          "photos": [
+            {"link": "https://ireland.apollo.olxcdn.com/v1/files/olx_photo_3/image;s={width}x{height}"}
+          ],
+          "location": {
+            "city": {"name": "Вінниця"}
+          },
+          "created_time": "2026-09-28T17:15:00+03:00"
+        },
+        {
+          "id": 829104814,
+          "url": "https://www.olx.ua/d/uk/obyavlenie/bmw-520-obmen-na-audi-a6-c5-ID829104814.html",
+          "title": "BMW 520 E39 2001 обмен на Audi A6 C5 1.9 TDI",
+          "description": "Продам BMW 520i в хорошем состоянии или интересует обмен на Audi A6 C5 1.9 TDI седан с моей доплатой.",
+          "price": {
+            "value": 4600,
+            "currency": "USD"
+          },
+          "params": [
+            {"key": "model", "value": {"label": "5-Series"}},
+            {"key": "year", "value": {"label": "2001"}},
+            {"key": "fuel_type", "value": {"label": "Бензин"}}
+          ],
+          "photos": [],
+          "location": {
+            "city": {"name": "Київ"}
+          },
+          "created_time": "2026-09-28T16:00:00+03:00"
+        }
+      ]
+    }
+  }
+}
