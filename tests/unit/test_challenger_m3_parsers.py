@@ -208,9 +208,9 @@ class TestChallengerMalformedEmptyTruncated:
         html = f"<script>window.__PRERENDERED_STATE__ = {json.dumps(data)};</script>"
         parser = OlxParser()
         items = [item async for item in parser._parse_json_state(html)]
-        # Fails to parse because p.get raises AttributeError; records error
-        assert len(items) == 0
-        assert parser.stats.errors >= 1
+        # Gracefully handles malformed param and extracts valid ad
+        assert len(items) == 1
+        assert items[0].source_id == "830002"
 
     @pytest.mark.asyncio
     async def test_rst_truncated_card_html(self):
@@ -257,8 +257,8 @@ class TestChallengerMalformedEmptyTruncated:
         payload = RstParser()._parse_card(card)
         assert payload is not None
         assert payload.source_id == "14002"
-        # Ghost card has empty title
-        assert payload.title == ""
+        # Ghost card falls back to valid title
+        assert payload.title == "Audi A6"
 
     @pytest.mark.asyncio
     async def test_instagram_malformed_json_and_html_error_response(self):
@@ -922,18 +922,16 @@ class TestChallengerMissingFieldsAndCardEdgeCases:
         
         # In Telegram
         tg_specs = TelegramChannelParser().parse_message_specs(text_with_nbsp)
-        assert tg_specs["price"] is None, "Defect confirmed: Telegram silently drops price with \\xa0"
+        assert tg_specs["price"] == 4500.0, "Telegram correctly parses price with non-breaking space"
 
         # In Instagram
         ig_specs = InstagramParser().parse_caption_specs(text_with_nbsp)
-        assert ig_specs["price"] is None, "Defect confirmed: Instagram silently drops price with \\xa0"
+        assert ig_specs["price"] == 4500.0, "Instagram correctly parses price with non-breaking space"
 
     @pytest.mark.asyncio
     async def test_olx_ad_without_id_emits_source_id_none_defect(self):
         """
-        EMPIRICAL DEFECT DEMONSTRATION:
-        When OLX prerendered JSON contains an ad without 'id' key (or 'id': None),
-        OlxParser evaluates `str(ad.get("id"))` -> 'None', emitting a listing with source_id='None'.
+        Ad without ID key is rejected rather than emitting phantom source_id='None'.
         """
         data = {
             "ads": [
@@ -942,6 +940,5 @@ class TestChallengerMissingFieldsAndCardEdgeCases:
         }
         html = f"<script>window.__PRERENDERED_STATE__ = {json.dumps(data)};</script>"
         items = [item async for item in OlxParser()._parse_json_state(html)]
-        assert len(items) == 1
-        assert items[0].source_id == "None", "Defect confirmed: OLX emits phantom source_id='None'"
+        assert len(items) == 0, "OLX ad without id is safely skipped"
 

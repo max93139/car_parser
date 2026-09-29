@@ -14,6 +14,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
+from bs4 import BeautifulSoup
 
 from src.models.listing import RawListingPayload
 from src.parsers.base import BaseParser, ParserRunStats, USER_AGENTS
@@ -638,3 +639,76 @@ class TestMultiParserErrorIsolation:
         assert parser_fail.stats.errors >= 1
         assert parser_ria.stats.status == "SUCCESS"
         assert parser_rst.stats.status == "SUCCESS"
+
+
+# ==============================================================================
+# 8. Remediation Unit Tests (Milestone M3 Edge Cases)
+# ==============================================================================
+
+class TestRemediationM3ParserEdgeCases:
+    """Verifies fixes for non-breaking spaces, missing OLX IDs, malformed OLX params, and RST ghost cards."""
+
+    def test_telegram_and_instagram_price_with_non_breaking_spaces(self):
+        text_with_nbsp = "Audi A6 C5 2001\nЦіна: 4\xa0500 $\nМісто: Київ"
+
+        # In Telegram
+        tg_specs = TelegramChannelParser().parse_message_specs(text_with_nbsp)
+        assert tg_specs["price"] == 4500.0
+        assert tg_specs["currency"] == "USD"
+
+        # In Instagram
+        ig_specs = InstagramParser().parse_caption_specs(text_with_nbsp)
+        assert ig_specs["price"] == 4500.0
+        assert ig_specs["currency"] == "USD"
+
+    @pytest.mark.asyncio
+    async def test_olx_ad_without_id_or_none_string_skipped(self):
+        data = {
+            "ads": [
+                {"title": "Audi A6 2001 No ID", "price": {"value": 4100, "currency": "USD"}},
+                {"id": None, "title": "Audi A6 None ID", "price": {"value": 4200, "currency": "USD"}},
+                {"id": "None", "title": "Audi A6 String None ID", "price": {"value": 4300, "currency": "USD"}},
+                {"id": "  ", "title": "Audi A6 Blank ID", "price": {"value": 4400, "currency": "USD"}},
+                {"id": "999001", "title": "Audi A6 Valid ID", "price": {"value": 4500, "currency": "USD"}},
+            ]
+        }
+        html = f"<script>window.__PRERENDERED_STATE__ = {json.dumps(data)};</script>"
+        parser = OlxParser()
+        items = [item async for item in parser._parse_json_state(html)]
+        assert len(items) == 1
+        assert items[0].source_id == "999001"
+        assert items[0].price == 4500.0
+
+    @pytest.mark.asyncio
+    async def test_olx_malformed_params_and_photos_tolerated(self):
+        data = {
+            "ads": [
+                {
+                    "id": "830002",
+                    "title": "Audi A6 1.8T 2000",
+                    "params": ["malformed_string_param", None, 12345, {"key": "year", "value": {"label": "2000"}}],
+                    "photos": ["bad_photo_str", None, {"link": "https://img.olx.ua/{width}x{height}/123.jpg"}],
+                }
+            ]
+        }
+        html = f"<script>window.__PRERENDERED_STATE__ = {json.dumps(data)};</script>"
+        parser = OlxParser()
+        items = [item async for item in parser._parse_json_state(html)]
+        assert len(items) == 1
+        assert items[0].source_id == "830002"
+        assert items[0].year == 2000
+        assert items[0].images == ["https://img.olx.ua/1000x700/123.jpg"]
+
+    def test_rst_ghost_card_title_fallback(self):
+        html = """
+        <div class="rst-ocb-i">
+            <a class="rst-ocb-i-a" href="/ukr/oldcars/audi/a6/audi_a6_14002.html">
+            </a>
+        </div>
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        card = soup.select_one(".rst-ocb-i")
+        payload = RstParser()._parse_card(card)
+        assert payload is not None
+        assert payload.source_id == "14002"
+        assert payload.title == "Audi A6"

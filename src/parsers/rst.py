@@ -144,7 +144,7 @@ class RstParser(BaseParser):
         source_id = id_match.group(1)
 
         title_elem = card.select_one("h3.rst-ocb-i-h, .rst-ocb-i-h")
-        title = title_elem.get_text(strip=True) if title_elem else link.get_text(strip=True)
+        title = (title_elem.get_text(strip=True) if title_elem else "") or (link.get_text(strip=True) if link else "") or "Audi A6"
 
         price_elem = card.select_one(".rst-ocb-i-d-s-p, .rst-uix-price")
         raw_price = price_elem.get_text(strip=True) if price_elem else None

@@ -165,7 +165,7 @@ class InstagramParser(BaseParser):
         # Price
         price_match = re.search(r"(?:Ціна|Цена|Price)?[:\s-]*(\d[\d\s]{2,})\s*(\$|USD|грн|UAH|EUR|€)", text, re.IGNORECASE)
         if price_match:
-            raw_nums = price_match.group(1).replace(" ", "")
+            raw_nums = re.sub(r"[^\d.]", "", price_match.group(1))
             curr_sym = price_match.group(2)
             try:
                 specs["price"] = float(raw_nums)

@@ -361,6 +361,63 @@ class TestPipelineRunnerExecution:
         assert last_call_kwargs["price_drop_info"]["diff_usd"] == -300.0
 
     @pytest.mark.asyncio
+    async def test_pipeline_skips_notification_when_send_needs_review_false(
+        self, runner_test_engine, runner_session_factory
+    ):
+        settings = Settings()
+        settings.telegram_bot.send_needs_review = False
+
+        mock_notifier = MagicMock(spec=TelegramNotifier)
+        mock_notifier.send_listing_alert = AsyncMock(return_value=True)
+        mock_notifier.close = AsyncMock()
+
+        # Listing that will trigger NEEDS_REVIEW (1997 transition with 1.9 TDI)
+        review_raw = RawListingPayload(
+            source="auto_ria",
+            source_id="review_car_97",
+            url="https://auto.ria.com/review_car",
+            title="Audi A6 1.9 TDI 1997",
+            price=4000.0,
+            year=1997,
+            engine="1.9 TDI",
+        )
+        mock_parser = MockScraper("auto_ria", items=[review_raw])
+
+        runner = PipelineRunner(
+            config=settings,
+            dry_run=False,
+            engine=runner_test_engine,
+            session_factory=runner_session_factory,
+            notifier=mock_notifier,
+        )
+
+        with patch.object(runner, "initialize_parsers", return_value=[mock_parser]):
+            summary = await runner.run()
+
+        assert summary["total_scanned"] == 1
+        assert summary["matched_filter"] == 1
+        assert summary["new"] == 1
+        assert summary["notified"] == 0  # Alert skipped due to send_needs_review=False
+        mock_notifier.send_listing_alert.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_pipeline_no_parsers_returns_zero_summary(
+        self, runner_test_engine, runner_session_factory
+    ):
+        settings = Settings()
+        runner = PipelineRunner(
+            config=settings,
+            engine=runner_test_engine,
+            session_factory=runner_session_factory,
+        )
+
+        with patch.object(runner, "initialize_parsers", return_value=[]):
+            summary = await runner.run()
+
+        assert summary["total_scanned"] == 0
+        assert summary["new"] == 0
+
+    @pytest.mark.asyncio
     async def test_async_main_cli_entry_point(self, runner_test_engine):
         mock_run = AsyncMock(return_value={"total_scanned": 10, "new": 1, "errors": 0})
         with patch("src.runner.PipelineRunner.run", mock_run), \
@@ -368,3 +425,4 @@ class TestPipelineRunnerExecution:
             code = await async_main(["--dry-run", "--source", "auto_ria"])
             assert code == 0
             mock_run.assert_called_once()
+

@@ -128,9 +128,10 @@ class OlxParser(BaseParser):
 
         for ad in ads:
             try:
-                ad_id = str(ad.get("id"))
-                if not ad_id:
+                raw_id = ad.get("id")
+                if raw_id is None or str(raw_id).strip() in ("", "None"):
                     continue
+                ad_id = str(raw_id).strip()
 
                 url = ad.get("url", "")
                 if url and not url.startswith("http"):
@@ -156,9 +157,11 @@ class OlxParser(BaseParser):
                             raw_price = str(val)
 
                 # Params map
-                raw_params = ad.get("params", [])
+                raw_params = ad.get("params") or []
                 params_map: Dict[str, str] = {}
                 for p in raw_params:
+                    if not isinstance(p, dict):
+                        continue
                     k = p.get("key")
                     v_dict = p.get("value", {})
                     v_label = v_dict.get("label") if isinstance(v_dict, dict) else str(v_dict)
@@ -186,7 +189,9 @@ class OlxParser(BaseParser):
 
                 # Photos formatting
                 photos: List[str] = []
-                for p in ad.get("photos", []):
+                for p in (ad.get("photos") or []):
+                    if not isinstance(p, dict):
+                        continue
                     link = p.get("link", "")
                     if link:
                         formatted_link = link.replace("{width}x{height}", "1000x700")
