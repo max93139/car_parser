@@ -205,16 +205,38 @@ class PipelineRunner:
         Returns execution outcome dictionary.
         """
         # Step 1: Filter
-        filter_res = filter_engine.filter_listing(raw_payload)
-        status_val = filter_res.status.value if hasattr(filter_res.status, "value") else str(filter_res.status)
-        if filter_res.is_rejected:
-            return {
-                "outcome": "REJECTED",
-                "filter_status": status_val,
-                "is_duplicate": False,
-                "is_price_drop": False,
-                "notified": False,
-            }
+        raw_m = (getattr(raw_payload, "model", None) or "").strip().upper()
+        raw_g = (getattr(raw_payload, "generation", None) or "").strip().upper()
+        is_c5_target = (not raw_m or raw_m == "A6") and (not raw_g or raw_g == "C5")
+
+        if is_c5_target:
+            filter_res = filter_engine.filter_listing(raw_payload)
+            status_val = filter_res.status.value if hasattr(filter_res.status, "value") else str(filter_res.status)
+            if filter_res.is_rejected:
+                return {
+                    "outcome": "REJECTED",
+                    "filter_status": status_val,
+                    "is_duplicate": False,
+                    "is_price_drop": False,
+                    "notified": False,
+                }
+        else:
+            # Multi-model path (e.g. A4, or A6 C4/C6/C7): apply negative context filtering (Track A)
+            clean_title = (getattr(raw_payload, "title", None) or "").lower()
+            clean_desc = (getattr(raw_payload, "description", None) or getattr(raw_payload, "raw_text", None) or "").lower()
+            from src.filtering.negative_rules import evaluate_negative_rules
+            neg_reason = evaluate_negative_rules(clean_title, clean_desc)
+            if neg_reason:
+                return {
+                    "outcome": "REJECTED",
+                    "filter_status": "REJECT",
+                    "is_duplicate": False,
+                    "is_price_drop": False,
+                    "notified": False,
+                }
+            from src.models.filter_result import FilterResult, FilterStatus
+            filter_res = FilterResult(status=FilterStatus.PASS, confidence=1.0)
+            status_val = "PASS"
 
         # Step 2: Convert to unified Listing model
         payload_data = raw_payload.model_dump()
