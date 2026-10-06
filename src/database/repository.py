@@ -128,11 +128,20 @@ async def find_matching_listings(
     # 4. Transmission
     if user_filter.transmission == "manual":
         stmt = stmt.where(
-            ListingModel.transmission.in_(["механіка", "manual", "механика"])
+            or_(
+                ListingModel.transmission.ilike("%механ%"),
+                ListingModel.transmission.ilike("%manual%"),
+                ListingModel.transmission.ilike("%ручн%"),
+            )
         )
     elif user_filter.transmission == "automatic":
         stmt = stmt.where(
-            ListingModel.transmission.in_(["автомат", "automatic", "типроник", "варіатор"])
+            or_(
+                ListingModel.transmission.ilike("%автомат%"),
+                ListingModel.transmission.ilike("%auto%"),
+                ListingModel.transmission.ilike("%типтрон%"),
+                ListingModel.transmission.ilike("%варіат%"),
+            )
         )
 
     # 4.1 Drive type
