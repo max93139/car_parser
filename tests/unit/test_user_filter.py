@@ -157,19 +157,19 @@ def test_keyboards_generation():
     rows = kb["inline_keyboard"]
     assert len(rows) >= 8
 
-    # First row is engines
-    eng_row = rows[0]
+    # Models rows are first two rows, then engines
+    eng_row = next(r for r in rows if any("1.8T" in b["text"] for b in r))
     texts = [b["text"] for b in eng_row]
     assert "❌ 1.8T" in texts
     assert "❌ 2.4" in texts
     assert "✅ 1.9 TDI" in texts
 
-    # Second row is price
-    price_row = rows[1]
+    # Price row
+    price_row = next(r for r in rows if any("Вказати ціну" in b["text"] for b in r))
     assert "Вказати ціну" in price_row[0]["text"]
 
-    # Fourth row is mileage
-    mil_row = rows[3]
+    # Mileage row
+    mil_row = next(r for r in rows if any("Вказати пробіг" in b["text"] for b in r))
     assert "Вказати пробіг" in mil_row[0]["text"]
 
 

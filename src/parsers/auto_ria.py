@@ -49,8 +49,9 @@ class AutoRiaParser(BaseParser):
                 "categories.main.id": "1",  # Passenger cars
                 "brand.id[0]": "6",         # Audi
                 "model.id[0]": "49",        # A6
-                "year[0].gte": "1997",
-                "year[0].lte": "2005",
+                "model.id[1]": "39",        # A4
+                "year[0].gte": "1994",
+                "year[0].lte": "2018",
                 "order_by": "2",            # Newest first
                 "page": str(page),
             }
@@ -113,9 +114,16 @@ class AutoRiaParser(BaseParser):
         url = raw_url.split("?")[0].split("#")[0]
         
         title_elem = ticket.select_one("div[class*='titleS'], a.address, a.m-link-ticket")
-        title = title_elem.get_text(strip=True) if title_elem else (link_elem.get_text(strip=True) if link_elem else "Audi A6")
+        title = title_elem.get_text(strip=True) if title_elem else (link_elem.get_text(strip=True) if link_elem else "Audi")
         if not title or len(title) > 80:
-            title = "Audi A6"
+            title = "Audi"
+
+        # Detect model from title or link
+        model_name = "A6"
+        if re.search(r"\b[aа]4\b", title, re.IGNORECASE) or (link_elem and "audi_a4" in link_elem.get("href", "")):
+            model_name = "A4"
+        elif re.search(r"\b[aа]6\b", title, re.IGNORECASE) or (link_elem and "audi_a6" in link_elem.get("href", "")):
+            model_name = "A6"
 
         # 3. Price & Currency
         price_val: Optional[float] = None
@@ -213,15 +221,37 @@ class AutoRiaParser(BaseParser):
             # Check 2nd item which is commonly city in AUTO.RIA layout
             raw_location = char_items[1]
 
-        # 9. Year
+        # 9. Year & Generation
         year_val: Optional[int] = None
         raw_year: Optional[str] = None
-        year_match = re.search(r"\b(199[7-9]|200[0-5])\b", title) or re.search(r"\b(199[7-9]|200[0-5])\b", ticket.get_text())
+        year_match = re.search(r"\b(199\d|20[0-2]\d)\b", title) or re.search(r"\b(199\d|20[0-2]\d)\b", ticket.get_text())
         if year_match:
             year_val = int(year_match.group(1))
             raw_year = year_match.group(1)
             if str(year_val) not in title:
                 title = f"{title} {year_val}"
+
+        # Detect generation based on model and year / text
+        gen_val = "C5" if model_name == "A6" else "B6"
+        full_card_text = f"{title} {raw_text_summary}".upper()
+        if model_name == "A6":
+            if "C4" in full_card_text or (year_val and year_val < 1997):
+                gen_val = "C4"
+            elif "C5" in full_card_text or (year_val and 1997 <= year_val <= 2004):
+                gen_val = "C5"
+            elif "C6" in full_card_text or (year_val and 2004 <= year_val <= 2011):
+                gen_val = "C6"
+            elif "C7" in full_card_text or (year_val and 2011 <= year_val <= 2018):
+                gen_val = "C7"
+        elif model_name == "A4":
+            if "B5" in full_card_text or (year_val and year_val < 2001):
+                gen_val = "B5"
+            elif "B6" in full_card_text or (year_val and 2001 <= year_val <= 2004):
+                gen_val = "B6"
+            elif "B7" in full_card_text or (year_val and 2004 <= year_val <= 2008):
+                gen_val = "B7"
+            elif "B8" in full_card_text or (year_val and 2008 <= year_val <= 2015):
+                gen_val = "B8"
 
         # 10. High-res photos
         image_urls: List[str] = []
@@ -258,6 +288,9 @@ class AutoRiaParser(BaseParser):
             transmission=raw_trans,
             raw_location=raw_location,
             location=raw_location,
+            brand="Audi",
+            model=model_name,
+            generation=gen_val,
             image_urls=image_urls[:10],
             images=image_urls[:10],
             extra_attributes={"page": 1, "card_source": "auto_ria_search"},

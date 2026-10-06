@@ -157,8 +157,35 @@ class BotHandler:
                 uf = await get_or_create_user_filter(session, chat_id)
                 alert_text: Optional[str] = None
 
+                # 0. Toggle Model & Generation (e.g. A6 C5, A6 C6, A4 B6)
+                if data.startswith("toggle_model:"):
+                    mod_raw = data.split(":", 1)[1]
+                    mod_map = {
+                        "A6C5": "A6 C5",
+                        "A6C6": "A6 C6",
+                        "A6C7": "A6 C7",
+                        "A6C4": "A6 C4",
+                        "A4B6": "A4 B6",
+                        "A4B7": "A4 B7",
+                        "A4B8": "A4 B8",
+                        "A4B5": "A4 B5",
+                    }
+                    target_model = mod_map.get(mod_raw, mod_raw)
+                    current_models = list(getattr(uf, "selected_models", None) or ["A6 C5"])
+
+                    if target_model in current_models:
+                        if len(current_models) == 1:
+                            alert_text = "Має бути обрана щонайменше одна модель!"
+                        else:
+                            current_models.remove(target_model)
+                    else:
+                        current_models.append(target_model)
+
+                    if not alert_text:
+                        uf.selected_models = current_models
+
                 # 1. Toggle engine
-                if data.startswith("toggle_eng:"):
+                elif data.startswith("toggle_eng:"):
                     eng_clean = data.split(":", 1)[1]
                     # Map back to standard representation
                     eng_map = {"1.8T": "1.8T", "2.4": "2.4", "1.9TDI": "1.9 TDI"}

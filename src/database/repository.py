@@ -15,6 +15,7 @@ from src.database.models import ListingModel, UserFilterModel
 logger = logging.getLogger(__name__)
 
 DEFAULT_ENGINES = ["1.8T", "2.4", "1.9 TDI"]
+DEFAULT_MODELS = ["A6 C5"]
 
 
 async def get_or_create_user_filter(session: AsyncSession, chat_id: str) -> UserFilterModel:
@@ -28,6 +29,7 @@ async def get_or_create_user_filter(session: AsyncSession, chat_id: str) -> User
     if user_filter is None:
         user_filter = UserFilterModel(
             chat_id=str(chat_id),
+            selected_models=list(DEFAULT_MODELS),
             engines=list(DEFAULT_ENGINES),
             min_price=None,
             max_price=None,
@@ -68,6 +70,7 @@ async def reset_user_filter(session: AsyncSession, chat_id: str) -> UserFilterMo
     return await update_user_filter(
         session,
         chat_id,
+        selected_models=list(DEFAULT_MODELS),
         engines=list(DEFAULT_ENGINES),
         min_price=None,
         max_price=None,
@@ -87,10 +90,21 @@ async def find_matching_listings(
     """
     Finds the most recent listings matching user's custom filter criteria.
     """
+    from sqlalchemy import or_, and_
+
+    active_models = getattr(user_filter, "selected_models", None) or DEFAULT_MODELS
+    model_conditions = []
+    for sm in active_models:
+        parts = sm.split()
+        if len(parts) == 2:
+            m, g = parts[0], parts[1]
+            model_conditions.append(and_(ListingModel.model == m, ListingModel.generation == g))
+        else:
+            model_conditions.append(ListingModel.model == sm)
+
     stmt = select(ListingModel).where(
         ListingModel.brand == "Audi",
-        ListingModel.model == "A6",
-        ListingModel.generation == "C5",
+        or_(*model_conditions) if model_conditions else True,
     )
 
     # 1. Price filters

@@ -9,12 +9,18 @@ from typing import Any, Dict, List, Optional
 from src.database.models import UserFilterModel
 
 ALL_ENGINES = ["1.8T", "2.4", "1.9 TDI"]
+SUPPORTED_A6 = ["A6 C5", "A6 C6", "A6 C7", "A6 C4"]
+SUPPORTED_A4 = ["A4 B6", "A4 B7", "A4 B8", "A4 B5"]
 
 
 def format_filter_summary(uf: UserFilterModel) -> str:
     """
-    Renders human-readable summary of current filter preferences for Audi A6 C5.
+    Renders human-readable summary of current filter preferences for Audi A6 & A4.
     """
+    # Models
+    active_models = getattr(uf, "selected_models", None) or ["A6 C5"]
+    models_str = ", ".join(f"Audi {m}" for m in active_models) if active_models else "Не обрано ⚠️"
+
     # Engines
     active_eng = uf.engines if uf.engines else ALL_ENGINES
     engines_str = ", ".join(active_eng) if active_eng else "Всі вимкнені ⚠️"
@@ -25,7 +31,7 @@ def format_filter_summary(uf: UserFilterModel) -> str:
     price_str = f"від {p_min} до {p_max}"
 
     # Years
-    year_str = f"{uf.min_year or 1997} – {uf.max_year or 2005}"
+    year_str = f"{uf.min_year or 1997} – {uf.max_year or 2018}"
     if uf.min_year == 1997 and uf.max_year == 2001:
         year_str += " (Дорестайл)"
     elif uf.min_year == 2001 and uf.max_year == 2005:
@@ -46,7 +52,8 @@ def format_filter_summary(uf: UserFilterModel) -> str:
     cond_str = "Тільки цілі / на ходу (без ДТП) ✅" if uf.exclude_damaged else "Без обмежень"
 
     return (
-        "⚙️ <b>Налаштування пошуку Audi A6 C5</b>\n\n"
+        "⚙️ <b>Налаштування пошуку Audi (A6 / A4)</b>\n\n"
+        f"🚘 <b>Моделі:</b> {models_str}\n"
         f"⛽ <b>Двигуни:</b> {engines_str}\n"
         f"💰 <b>Ціна:</b> {price_str}\n"
         f"📅 <b>Роки:</b> {year_str}\n"
@@ -61,9 +68,30 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
     """
     Builds the Telegram inline keyboard for interactive configuration.
     """
+    active_models = getattr(uf, "selected_models", None) or ["A6 C5"]
     active_eng = uf.engines if uf.engines is not None else ALL_ENGINES
 
-    # 1. Engines row
+    # 0. Audi A6 models row
+    a6_buttons = []
+    for m in SUPPORTED_A6:
+        is_on = m in active_models
+        icon = "✅ " if is_on else ""
+        a6_buttons.append({
+            "text": f"{icon}{m}",
+            "callback_data": f"toggle_model:{m.replace(' ', '')}",
+        })
+
+    # 1. Audi A4 models row
+    a4_buttons = []
+    for m in SUPPORTED_A4:
+        is_on = m in active_models
+        icon = "✅ " if is_on else ""
+        a4_buttons.append({
+            "text": f"{icon}{m}",
+            "callback_data": f"toggle_model:{m.replace(' ', '')}",
+        })
+
+    # 2. Engines row
     eng_buttons = []
     for eng in ALL_ENGINES:
         is_on = eng in active_eng
@@ -121,6 +149,8 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
 
     return {
         "inline_keyboard": [
+            a6_buttons,
+            a4_buttons,
             eng_buttons,
             price_buttons,
             trans_buttons,

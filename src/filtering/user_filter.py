@@ -50,6 +50,27 @@ def matches_user_filter(
     if user_filter is None:
         return True
 
+    # 0. Model & Generation check
+    selected_models = getattr(user_filter, "selected_models", None)
+    if selected_models:
+        l_model = (getattr(listing, "model", None) or "").strip().upper()
+        l_gen = (getattr(listing, "generation", None) or "").strip().upper()
+        l_title = (getattr(listing, "title", None) or "").strip().upper()
+        l_combo = f"{l_model} {l_gen}".strip()
+
+        matched_any_model = False
+        for sm in selected_models:
+            sm_clean = sm.strip().upper()
+            if sm_clean in l_combo or l_combo in sm_clean or sm_clean in l_title:
+                matched_any_model = True
+                break
+            parts = sm_clean.split()
+            if len(parts) == 2 and parts[0] in l_title and parts[1] in l_title:
+                matched_any_model = True
+                break
+        if not matched_any_model:
+            return False
+
     # 1. Price check
     price = getattr(listing, "price", None)
     if price is not None:

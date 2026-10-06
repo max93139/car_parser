@@ -92,7 +92,7 @@ class ListingModel(Base):
 
     __table_args__ = (
         UniqueConstraint("source_id", "source_listing_id", name="uq_listings_source_id_listing_id"),
-        CheckConstraint("year >= 1990 AND year <= 2015", name="chk_listings_year"),
+        CheckConstraint("year >= 1990 AND year <= 2030", name="chk_listings_year"),
         CheckConstraint("mileage >= 0", name="chk_listings_mileage"),
         Index("idx_listings_canonical_url", "canonical_url"),
         Index("idx_listings_content_fingerprint", "content_fingerprint"),
@@ -268,6 +268,7 @@ class UserFilterModel(Base):
     __tablename__ = "user_filters"
 
     chat_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    selected_models: Mapped[list[str]] = mapped_column(JSONType, default=lambda: ["A6 C5"], nullable=False)
     engines: Mapped[list[str]] = mapped_column(JSONType, default=lambda: ["1.8T", "2.4", "1.9 TDI"], nullable=False)
     min_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     max_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
