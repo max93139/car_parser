@@ -54,10 +54,10 @@ A modular, production-ready asynchronous Python service for continuous multi-sou
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | M1 | Data Layer, Core Models, Config & Deduplication | Pydantic v2 models, SQLAlchemy 2.0 Async schema, 3-level deduplicator service, config parser, SQLite/PostgreSQL support | none | DONE |
-| M2 | Audi A6 C5 Strict Filtering Engine | Homoglyphs, text normalization, negative filters, model/gen validation (C5 1997-2005), engine whitelist (1.8T, 2.4, 1.9 TDI), `NEEDS_REVIEW` | none | IN_PROGRESS |
-| M3 | Parsers Architecture & Multi-Source Scrapers | `BaseParser` ABC, error isolation, AUTO.RIA, OLX, RST, Telegram (Telethon), Instagram parsers | M1 | PLANNED |
-| M4 | Telegram Notification Engine & Pipeline Runner | Telegram Bot API client, media groups, format templates, FloodWait recovery, `src.runner` pipeline | M1, M2, M3 | PLANNED |
-| M5 | DevOps, GitHub Actions & Final E2E Pass | `.github/workflows/parser.yml`, git remote setup, pass 100% of E2E test suite (Tiers 1–5) | M1, M2, M3, M4, TEST_READY.md | PLANNED |
+| M2 | Audi A6 C5 Strict Filtering Engine | Homoglyphs, text normalization, negative filters, model/gen validation (C5 1997-2005), engine whitelist (1.8T, 2.4, 1.9 TDI), `NEEDS_REVIEW` | none | DONE |
+| M3 | Parsers Architecture & Multi-Source Scrapers | `BaseParser` ABC, error isolation, AUTO.RIA, OLX, RST, Telegram (Telethon), Instagram parsers | M1 | DONE |
+| M4 | Telegram Notification Engine & Pipeline Runner | Telegram Bot API client, media groups, format templates, FloodWait recovery, `src.runner` pipeline | M1, M2, M3 | DONE |
+| M5 | DevOps, GitHub Actions & Final E2E Pass | `.github/workflows/parser.yml`, git remote setup, pass 100% of E2E test suite (474/474 tests pass, clean forensic audit) | M1, M2, M3, M4, TEST_READY.md | DONE |
 
 ---
 

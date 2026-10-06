@@ -117,7 +117,15 @@ class Settings(BaseSettings):
     def sync_env_overrides(self) -> Settings:
         """Propagate explicit root environment variables into respective config models."""
         if self.DATABASE_URL:
-            self.database.url = self.DATABASE_URL
+            url_str = self.DATABASE_URL
+            if url_str.startswith("postgresql://"):
+                url_str = "postgresql+asyncpg://" + url_str[len("postgresql://"):]
+            if "channel_binding=" in url_str:
+                url_str = url_str.replace("channel_binding=require&", "").replace("&channel_binding=require", "")
+            if "sslmode=require" in url_str and "ssl=" not in url_str:
+                url_str = url_str.replace("sslmode=require", "ssl=require")
+            self.database.url = url_str
+            self.DATABASE_URL = url_str
         else:
             self.DATABASE_URL = self.database.url
 

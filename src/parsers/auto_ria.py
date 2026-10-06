@@ -23,7 +23,7 @@ class AutoRiaParser(BaseParser):
 
     def __init__(
         self,
-        base_url: str = "https://auto.ria.com/uk/car/audi/a6/",
+        base_url: str = "https://auto.ria.com/uk/search/",
         max_pages: int = 1,
         request_delay: float = 1.5,
         timeout: float = 15.0,
@@ -46,12 +46,12 @@ class AutoRiaParser(BaseParser):
 
         for page in range(1, self.max_pages + 1):
             params: Dict[str, Any] = {
-                "category_id": "1",  # Passenger cars
-                "marka_id": "9",     # Audi
-                "model_id": "6",     # A6
-                "s_yers[0]": "1997",
-                "po_yers[0]": "2005",
-                "order_by": "2",     # Newest first
+                "categories.main.id": "1",  # Passenger cars
+                "brand.id[0]": "6",         # Audi
+                "model.id[0]": "49",        # A6
+                "year[0].gte": "1997",
+                "year[0].lte": "2005",
+                "order_by": "2",            # Newest first
                 "page": str(page),
             }
 
@@ -65,7 +65,7 @@ class AutoRiaParser(BaseParser):
                     continue
 
                 soup = BeautifulSoup(html, "html.parser")
-                ticket_items = soup.select("section.ticket-item, div.ticket-item")
+                ticket_items = soup.select("section.ticket-item, div.ticket-item, a.product-card")
 
                 if not ticket_items:
                     logger.info("[auto_ria] No tickets found on page %d", page)
@@ -95,6 +95,8 @@ class AutoRiaParser(BaseParser):
         # 1. Source ID
         auto_id = ticket.get("data-auto-id") or ticket.get("data-id")
         link_elem = ticket.select_one("a.address, a.m-link-ticket")
+        if not link_elem and ticket.name == "a" and ticket.get("href"):
+            link_elem = ticket
 
         if not auto_id and link_elem and link_elem.get("href"):
             id_match = re.search(r"_(\d+)\.html", link_elem["href"])
@@ -106,19 +108,25 @@ class AutoRiaParser(BaseParser):
 
         # 2. Canonical URL & Title
         raw_url = link_elem["href"] if link_elem and link_elem.get("href") else f"https://auto.ria.com/uk/auto_audi_a6_{auto_id}.html"
+        if raw_url.startswith("/"):
+            raw_url = f"https://auto.ria.com{raw_url}"
         url = raw_url.split("?")[0].split("#")[0]
-        title = link_elem.get_text(strip=True) if link_elem else "Audi A6"
+        
+        title_elem = ticket.select_one("div[class*='titleS'], a.address, a.m-link-ticket")
+        title = title_elem.get_text(strip=True) if title_elem else (link_elem.get_text(strip=True) if link_elem else "Audi A6")
+        if not title or len(title) > 80:
+            title = "Audi A6"
 
         # 3. Price & Currency
         price_val: Optional[float] = None
         currency: str = "USD"
         raw_price_str: Optional[str] = None
 
-        usd_elem = ticket.select_one('[data-currency="USD"]')
+        usd_elem = ticket.select_one('[data-currency="USD"], span[class*="c-green"]')
         if usd_elem:
             raw_price_str = usd_elem.get_text(strip=True)
             currency = "USD"
-            nums = re.sub(r"[^\d.]", "", raw_price_str.replace(" ", ""))
+            nums = re.sub(r"[^\d.]", "", raw_price_str.replace(" ", "").replace("\xa0", ""))
             if nums:
                 price_val = float(nums)
         else:
@@ -129,14 +137,15 @@ class AutoRiaParser(BaseParser):
                     currency = "UAH"
                 elif "€" in raw_price_str:
                     currency = "EUR"
-                nums = re.sub(r"[^\d.]", "", raw_price_str.replace(" ", ""))
+                nums = re.sub(r"[^\d.]", "", raw_price_str.replace(" ", "").replace("\xa0", ""))
                 if nums:
                     price_val = float(nums)
 
         # 4. Characteristics list
         char_items: List[str] = [
             li.get_text(" ", strip=True)
-            for li in ticket.select("ul.characteristic li, div.item-char")
+            for li in ticket.select("ul.characteristic li, div.item-char, div.grid-wrapper span, div.grid-wrapper div")
+            if li.get_text(strip=True)
         ]
         raw_text_summary = " | ".join(char_items)
 
@@ -167,13 +176,21 @@ class AutoRiaParser(BaseParser):
         raw_engine: Optional[str] = None
         raw_fuel: Optional[str] = None
         for c in char_items:
-            if any(k in c.lower() for k in ["л.", "дизель", "бензин", "газ", "tdi"]):
+            c_low = c.lower()
+            if any(k in c_low for k in ["л.", " л", "дизель", "бензин", "газ", "tdi"]):
                 raw_engine = c
-                if "дизель" in c.lower() or "tdi" in c.lower():
+                if "2.39" in c or "2.4" in c:
+                    raw_engine = f"2.4 {c}"
+                elif "1.78" in c or "1.8" in c:
+                    raw_engine = f"1.8T {c}"
+                elif "1.89" in c or "1.9" in c:
+                    raw_engine = f"1.9 TDI {c}"
+
+                if "дизель" in c_low or "tdi" in c_low:
                     raw_fuel = "дизель"
-                elif "газ" in c.lower() and "бензин" in c.lower():
+                elif "газ" in c_low and "бензин" in c_low:
                     raw_fuel = "газ/бензин"
-                elif "бензин" in c.lower():
+                elif "бензин" in c_low:
                     raw_fuel = "бензин"
                 break
 
@@ -199,14 +216,16 @@ class AutoRiaParser(BaseParser):
         # 9. Year
         year_val: Optional[int] = None
         raw_year: Optional[str] = None
-        year_match = re.search(r"\b(199[7-9]|200[0-5])\b", title)
+        year_match = re.search(r"\b(199[7-9]|200[0-5])\b", title) or re.search(r"\b(199[7-9]|200[0-5])\b", ticket.get_text())
         if year_match:
             year_val = int(year_match.group(1))
             raw_year = year_match.group(1)
+            if str(year_val) not in title:
+                title = f"{title} {year_val}"
 
         # 10. High-res photos
         image_urls: List[str] = []
-        img_tags = ticket.select("picture img, div.ticket-photo img, .preview-gallery picture img")
+        img_tags = ticket.select("picture img, div.ticket-photo img, .preview-gallery picture img, img[data-src], img[src]")
         for img in img_tags:
             src = img.get("data-src") or img.get("src")
             if src and not src.endswith("nophoto.svg") and not src.startswith("data:"):
