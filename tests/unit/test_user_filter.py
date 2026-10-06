@@ -168,6 +168,33 @@ def test_keyboards_generation():
     price_row = rows[1]
     assert "Вказати ціну" in price_row[0]["text"]
 
+    # Fourth row is mileage
+    mil_row = rows[3]
+    assert "Вказати пробіг" in mil_row[0]["text"]
+
+
+def test_parse_mileage_input():
+    from src.bot.price_parser import parse_mileage_input
+
+    # Thousands suffix
+    assert parse_mileage_input("250 тис") == (True, 250000)
+    assert parse_mileage_input("до 280 тыс") == (True, 280000)
+    assert parse_mileage_input("300k") == (True, 300000)
+    assert parse_mileage_input("240к") == (True, 240000)
+
+    # Explicit keyword
+    assert parse_mileage_input("пробіг 250000") == (True, 250000)
+    assert parse_mileage_input("до 280 000 км") == (True, 280000)
+
+    # Plain digits
+    assert parse_mileage_input("250000") == (True, 250000)
+    assert parse_mileage_input("250") == (True, 250000)
+
+    # Reset
+    assert parse_mileage_input("0") == (True, None)
+    assert parse_mileage_input("скинути") == (True, None)
+    assert parse_mileage_input("будь-який") == (True, None)
+
 
 def test_parse_price_input():
     from src.bot.price_parser import parse_price_input

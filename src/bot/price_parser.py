@@ -56,3 +56,39 @@ def parse_price_input(text: str) -> Optional[Tuple[Optional[int], Optional[int]]
         return (None, val)
 
     return None
+
+
+def parse_mileage_input(text: str) -> Optional[Tuple[bool, Optional[int]]]:
+    """
+    Parses user typed text into max_mileage.
+    Returns (True, int_mileage) or (True, None) for reset, or None if not recognized.
+    """
+    clean = text.strip().lower()
+    if clean in ("0", "скинути", "скинь", "будь-який", "будь який", "любий", "все", "reset", "none"):
+        return (True, None)
+
+    # 1. Matches with thousands suffix: e.g. "250 тис", "280 тыс", "до 250к", "300k"
+    m_tis = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:тис|тыс|тис\.|тыс\.|[kк])\b", clean)
+    if m_tis:
+        num = float(m_tis.group(1).replace(",", "."))
+        return (True, int(num * 1000))
+
+    # 2. Matches with explicit context: "пробіг 250000", "до 280 000 км", "240000 км"
+    m_km = re.search(r"(?:пробіг|пробег|км)?[:\s]*(\d[\d\s]{4,7})\s*(?:км)?", clean)
+    if m_km and ("пробіг" in clean or "пробег" in clean or "км" in clean):
+        digits = re.sub(r"\s+", "", m_km.group(1))
+        if digits.isdigit():
+            val = int(digits)
+            if 10000 <= val <= 1000000:
+                return (True, val)
+
+    # 3. Plain digits (e.g. "250000" or short "250" when user enters in thousands)
+    digits = re.sub(r"[^\d]", "", clean)
+    if digits:
+        val = int(digits)
+        if 50 <= val <= 999:
+            return (True, val * 1000)
+        elif 10000 <= val <= 1000000:
+            return (True, val)
+
+    return None

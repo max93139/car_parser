@@ -15,3 +15,17 @@
 2026-10-06 23:26:53,438 [INFO] [src.database.ddl] Database schema initialized successfully.
 2026-10-06 23:26:53,439 [INFO] [src.bot] Starting Audi A6 C5 Telegram Bot Daemon...
 2026-10-06 23:26:53,439 [INFO] [src.bot.listener] [bot] Starting Audi A6 C5 Telegram Bot Listener...
+2026-10-06 23:27:18,768 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:27:43,835 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:28:08,900 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:28:33,966 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:28:59,024 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:29:24,091 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:29:49,150 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:30:14,220 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:30:39,283 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:31:04,347 [INFO] [httpx] HTTP Request: GET https://api.telegram.org/bot8998462406:AAHfrna1RB2ftl34WZhSgNSwIMC4F1jnn9s/getUpdates?offset=0&timeout=25&allowed_updates=message&allowed_updates=callback_query "HTTP/1.1 200 OK"
+2026-10-06 23:31:23,243 [INFO] [src.bot] Initializing database schemas...
+2026-10-06 23:31:30,195 [INFO] [src.database.ddl] Database schema initialized successfully.
+2026-10-06 23:31:30,196 [INFO] [src.bot] Starting Audi A6 C5 Telegram Bot Daemon...
+2026-10-06 23:31:30,197 [INFO] [src.bot.listener] [bot] Starting Audi A6 C5 Telegram Bot Listener...

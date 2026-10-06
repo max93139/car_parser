@@ -14,7 +14,7 @@ from src.bot.keyboards import (
     build_settings_keyboard,
     format_filter_summary,
 )
-from src.bot.price_parser import parse_price_input
+from src.bot.price_parser import parse_mileage_input, parse_price_input
 from src.database.connection import get_session_factory
 from src.database.models import UserFilterModel
 from src.database.repository import (
@@ -37,6 +37,7 @@ class BotHandler:
         self.bot_token = bot_token
         self.client = client
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.user_states: Dict[str, str] = {}
 
     async def send_message(
         self,
@@ -177,6 +178,7 @@ class BotHandler:
 
                 # 2. Price prompt & reset
                 elif data == "prompt_price":
+                    self.user_states[chat_id] = "awaiting_price"
                     await self.answer_callback(callback_id)
                     await self.send_message(
                         chat_id,
@@ -200,10 +202,24 @@ class BotHandler:
                     tr_val = data.split(":", 1)[1]
                     uf.transmission = tr_val
 
-                # 5. Mileage
-                elif data.startswith("set_mil:"):
-                    mil_val = data.split(":", 1)[1]
-                    uf.max_mileage = None if mil_val == "none" else int(mil_val)
+                # 5. Mileage prompt & reset
+                elif data == "prompt_mileage":
+                    self.user_states[chat_id] = "awaiting_mileage"
+                    await self.answer_callback(callback_id)
+                    await self.send_message(
+                        chat_id,
+                        "✍️ <b>Введіть максимальний пробіг у повідомленні</b>:\n\n"
+                        "Наприклад:\n"
+                        "• <code>250 тис</code> або <code>250000</code>\n"
+                        "• <code>до 280 000 км</code> або <code>280к</code>\n"
+                        "• Зняти обмеження: <code>0</code> або <code>скинути</code>\n\n"
+                        "<i>Просто надішліть число сюди в чат 👇</i>",
+                    )
+                    return
+
+                elif data == "reset_mileage":
+                    uf.max_mileage = None
+                    alert_text = "Обмеження за пробігом знято!"
 
                 # 6. Year range
                 elif data.startswith("set_year:"):
@@ -262,7 +278,7 @@ class BotHandler:
                 await self.edit_message_text(chat_id, message_id, summary, reply_markup=kb)
 
     async def handle_text_message(self, chat_id: str, text: str) -> None:
-        """Handles incoming text messages, including typed prices."""
+        """Handles incoming text messages, including typed prices and mileages."""
         clean_text = text.strip()
         if clean_text in ("/start", "/help"):
             await self.handle_start(chat_id)
@@ -271,8 +287,45 @@ class BotHandler:
             await self.handle_settings(chat_id)
             return
 
+        state = self.user_states.get(chat_id)
+
+        # 1. Check if user is inputting mileage or text explicitly contains mileage keywords
+        is_mileage_context = (
+            state == "awaiting_mileage"
+            or any(k in clean_text.lower() for k in ["пробіг", "пробег", "км"])
+        )
+
+        if is_mileage_context:
+            parsed_mil = parse_mileage_input(clean_text)
+            if parsed_mil is not None:
+                self.user_states.pop(chat_id, None)
+                _, mil_val = parsed_mil
+                factory = get_session_factory()
+                async with factory() as session:
+                    async with session.begin():
+                        uf = await get_or_create_user_filter(session, chat_id)
+                        uf.max_mileage = mil_val
+                        await session.flush()
+
+                        summary = format_filter_summary(uf)
+                        kb = build_settings_keyboard(uf)
+
+                        msg = (
+                            f"✅ <b>Встановлено макс. пробіг: до {mil_val:,} км!</b>"
+                            if mil_val
+                            else "✅ <b>Обмеження за пробігом знято!</b>"
+                        )
+                        await self.send_message(
+                            chat_id,
+                            f"{msg}\n\n{summary}",
+                            reply_markup=kb,
+                        )
+                return
+
+        # 2. Try parsing price
         parsed_price = parse_price_input(clean_text)
         if parsed_price is not None:
+            self.user_states.pop(chat_id, None)
             min_p, max_p = parsed_price
             factory = get_session_factory()
             async with factory() as session:
@@ -301,10 +354,33 @@ class BotHandler:
                     )
             return
 
+        # 3. Fallback: check if large number represents mileage (e.g. >= 50,000)
+        parsed_mil = parse_mileage_input(clean_text)
+        if parsed_mil is not None and parsed_mil[1] and parsed_mil[1] >= 50000:
+            self.user_states.pop(chat_id, None)
+            _, mil_val = parsed_mil
+            factory = get_session_factory()
+            async with factory() as session:
+                async with session.begin():
+                    uf = await get_or_create_user_filter(session, chat_id)
+                    uf.max_mileage = mil_val
+                    await session.flush()
+
+                    summary = format_filter_summary(uf)
+                    kb = build_settings_keyboard(uf)
+                    msg = f"✅ <b>Встановлено макс. пробіг: до {mil_val:,} км!</b>"
+                    await self.send_message(
+                        chat_id,
+                        f"{msg}\n\n{summary}",
+                        reply_markup=kb,
+                    )
+            return
+
         # Unknown message fallback
         await self.send_message(
             chat_id,
-            "Не вдалося розпізнати значення ціни.\n"
-            "Спробуйте написати у форматі: <code>3500-5000</code> або <code>до 5000</code>.\n"
+            "Не вдалося розпізнати значення.\n"
+            "• Щоб вказати ціну: наприклад <code>3500-5000</code> або <code>до 5000</code>.\n"
+            "• Щоб вказати пробіг: наприклад <code>250 тис</code> або <code>до 280000</code>.\n"
             "Або надішліть /settings для відкриття меню налаштувань.",
         )

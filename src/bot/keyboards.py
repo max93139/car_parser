@@ -88,14 +88,12 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
         {"text": f"{'🔘 ' if tr == 'automatic' else ''}Автомат", "callback_data": "set_trans:automatic"},
     ]
 
-    # 5. Mileage row
-    mil = uf.max_mileage
+    # 5. Mileage row (typing number instead of preset buttons)
     mil_buttons = [
-        {"text": f"{'🔘 ' if not mil else ''}Пробіг: Будь-який", "callback_data": "set_mil:none"},
-        {"text": f"{'🔘 ' if mil == 200000 else ''}до 200k", "callback_data": "set_mil:200000"},
-        {"text": f"{'🔘 ' if mil == 250000 else ''}до 250k", "callback_data": "set_mil:250000"},
-        {"text": f"{'🔘 ' if mil == 300000 else ''}до 300k", "callback_data": "set_mil:300000"},
+        {"text": "🛣 Вказати пробіг (вписати числом)", "callback_data": "prompt_mileage"},
     ]
+    if uf.max_mileage:
+        mil_buttons.append({"text": "❌ Скинути пробіг", "callback_data": "reset_mileage"})
 
     # 6. Years / Restyling row
     is_dorest = uf.min_year == 1997 and uf.max_year == 2001
