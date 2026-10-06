@@ -253,7 +253,22 @@ class AutoRiaParser(BaseParser):
             elif "B8" in full_card_text or (year_val and 2008 <= year_val <= 2015):
                 gen_val = "B8"
 
-        # 10. High-res photos
+        # 10. Drive type & Body type
+        raw_drive = "front"
+        raw_body = "sedan"
+        full_text_detect = f"{title} {raw_text_summary}".lower()
+
+        if any(q in full_text_detect for q in ["quattro", "кватро", "квадро", "повний", "полный", "4x4", "4wd"]):
+            raw_drive = "quattro"
+        elif any(f in full_text_detect for f in ["передній", "передний", "fwd"]):
+            raw_drive = "front"
+
+        if any(b in full_text_detect for b in ["avant", "авант", "універсал", "универсал", "wagon"]):
+            raw_body = "avant"
+        elif any(s in full_text_detect for s in ["седан", "sedan"]):
+            raw_body = "sedan"
+
+        # 11. High-res photos
         image_urls: List[str] = []
         img_tags = ticket.select("picture img, div.ticket-photo img, .preview-gallery picture img, img[data-src], img[src]")
         for img in img_tags:
@@ -291,6 +306,8 @@ class AutoRiaParser(BaseParser):
             brand="Audi",
             model=model_name,
             generation=gen_val,
+            body_type=raw_body,
+            drive_type=raw_drive,
             image_urls=image_urls[:10],
             images=image_urls[:10],
             extra_attributes={"page": 1, "card_source": "auto_ria_search"},

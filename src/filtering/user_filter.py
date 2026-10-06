@@ -114,6 +114,32 @@ def matches_user_filter(
         if trans and not any(a in trans for a in ["автомат", "auto", "типтрон", "варіат"]):
             return False
 
+    # 4.1 Drive type check (Quattro vs Front)
+    target_drive = getattr(user_filter, "drive_type", "any") or "any"
+    if target_drive != "any":
+        l_drive = (getattr(listing, "drive_type", None) or "").lower()
+        title_l = (getattr(listing, "title", None) or "").lower()
+        desc_l = (getattr(listing, "description", None) or getattr(listing, "raw_text", None) or "").lower()
+        full_d = f"{l_drive} {title_l} {desc_l}"
+        is_quattro = any(q in full_d for q in ["quattro", "кватро", "квадро", "повний", "полный", "4x4", "4wd"])
+        if target_drive == "quattro" and not is_quattro:
+            return False
+        elif target_drive == "front" and is_quattro:
+            return False
+
+    # 4.2 Body type check (Sedan vs Avant)
+    target_body = getattr(user_filter, "body_type", "any") or "any"
+    if target_body != "any":
+        l_body = (getattr(listing, "body_type", None) or "").lower()
+        title_b = (getattr(listing, "title", None) or "").lower()
+        desc_b = (getattr(listing, "description", None) or getattr(listing, "raw_text", None) or "").lower()
+        full_b = f"{l_body} {title_b} {desc_b}"
+        is_avant = any(av in full_b for av in ["avant", "авант", "універсал", "универсал", "wagon"])
+        if target_body == "avant" and not is_avant:
+            return False
+        elif target_body == "sedan" and is_avant:
+            return False
+
     # 5. Engine check
     active_engines = user_filter.engines or ["1.8T", "2.4", "1.9 TDI"]
     raw_engine = (getattr(listing, "engine", None) or getattr(listing, "engine_code", None) or "").lower()

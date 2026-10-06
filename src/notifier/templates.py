@@ -108,6 +108,26 @@ def format_price_drop_badge(
     )
 
 
+def format_market_badge(price_usd: Optional[float], avg_price_usd: Optional[float]) -> Optional[str]:
+    """Generates hot deal banner if price is >= 15% below market average."""
+    if not price_usd or not avg_price_usd or avg_price_usd <= 0:
+        return None
+    diff = avg_price_usd - price_usd
+    pct = (diff / avg_price_usd) * 100
+    if pct >= 15:
+        return f"🔥 <b>НИЗ РИНКУ!</b> (-${diff:,.0f}, на {pct:.0f}% дешевше ринку)"
+    return None
+
+
+def format_dealer_badge(ad_count: int) -> Optional[str]:
+    """Badges sellers based on total active/historical listings count."""
+    if ad_count >= 3:
+        return f"⚠️ <b>ПЕРЕКУП / АВТОМАЙДАНЧИК</b> (оголошень продавця: {ad_count})"
+    elif ad_count == 1:
+        return "👤 <b>Приватний власник</b>"
+    return None
+
+
 def format_needs_review_badge(reason: Optional[str] = None) -> str:
     """Generates an explicit warning badge for listings requiring manual review."""
     if reason:
@@ -196,6 +216,19 @@ def format_listing_caption(
         diff_p = price_drop_info.get("diff_usd")
         header_lines.append(format_price_drop_badge(old_p, new_p, diff_p))
 
+    # Market low price badge if applicable
+    avg_p = price_drop_info.get("avg_price_usd") if price_drop_info else None
+    market_badge = format_market_badge(price_usd, avg_p)
+    if market_badge:
+        header_lines.append(market_badge)
+
+    # Dealer / private owner badge
+    dealer_count = price_drop_info.get("seller_ad_count") if price_drop_info else None
+    if dealer_count is not None:
+        dealer_badge = format_dealer_badge(dealer_count)
+        if dealer_badge:
+            header_lines.append(dealer_badge)
+
     # Review needed badge if applicable
     if str(status).upper() == "NEEDS_REVIEW":
         reason_txt = ", ".join(review_reasons) if review_reasons else None
@@ -203,15 +236,26 @@ def format_listing_caption(
 
     header = "\n".join(header_lines) + "\n\n"
 
+    # Drive & Body string
+    drive_type = getattr(listing, "drive_type", None) or (listing.get("drive_type") if isinstance(listing, dict) else None)
+    body_type = getattr(listing, "body_type", None) or (listing.get("body_type") if isinstance(listing, dict) else None)
+    
+    drive_label = "Quattro (4x4) ⚡️" if drive_type == "quattro" else ("Передній" if drive_type == "front" else None)
+    body_label = "Універсал (Avant) 🚙" if body_type == "avant" else ("Седан 🏎" if body_type == "sedan" else None)
+
     # 4. Build Specs Body
     body_lines = [
         f"💰 <b>Ціна:</b> {formatted_price}",
     ]
     if year:
         body_lines.append(f"📅 <b>Рік:</b> {year}")
+    body_lines.append(f"⚙️ <b>Двигун:</b> {safe_engine}")
+    body_lines.append(f"🕹️ <b>КПП:</b> {safe_trans}")
+    if drive_label:
+        body_lines.append(f"⚡️ <b>Привід:</b> {drive_label}")
+    if body_label:
+        body_lines.append(f"🚙 <b>Кузов:</b> {body_label}")
     body_lines.extend([
-        f"⚙️ <b>Двигун:</b> {safe_engine}",
-        f"🕹️ <b>КПП:</b> {safe_trans}",
         f"🛣️ <b>Пробіг:</b> {formatted_mileage}",
         f"📍 <b>Місто:</b> {safe_location}",
         f"🏷️ <b>Джерело:</b> {safe_source}",

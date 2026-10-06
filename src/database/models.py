@@ -276,6 +276,8 @@ class UserFilterModel(Base):
     max_year: Mapped[Optional[int]] = mapped_column(Integer, default=2005, nullable=True)
     max_mileage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     transmission: Mapped[str] = mapped_column(String(32), default="any", nullable=False)
+    drive_type: Mapped[str] = mapped_column(String(32), default="any", nullable=False)
+    body_type: Mapped[str] = mapped_column(String(32), default="any", nullable=False)
     exclude_damaged: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

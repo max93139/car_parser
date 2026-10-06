@@ -135,6 +135,18 @@ async def find_matching_listings(
             ListingModel.transmission.in_(["автомат", "automatic", "типроник", "варіатор"])
         )
 
+    # 4.1 Drive type
+    if getattr(user_filter, "drive_type", "any") == "quattro":
+        stmt = stmt.where(ListingModel.drive_type == "quattro")
+    elif getattr(user_filter, "drive_type", "any") == "front":
+        stmt = stmt.where(ListingModel.drive_type == "front")
+
+    # 4.2 Body type
+    if getattr(user_filter, "body_type", "any") == "avant":
+        stmt = stmt.where(ListingModel.body_type == "avant")
+    elif getattr(user_filter, "body_type", "any") == "sedan":
+        stmt = stmt.where(ListingModel.body_type == "sedan")
+
     # 5. Engines
     active_engines = user_filter.engines or DEFAULT_ENGINES
     if active_engines:
@@ -157,3 +169,57 @@ async def find_matching_listings(
     stmt = stmt.order_by(ListingModel.first_seen_at.desc()).limit(limit)
     res = await session.execute(stmt)
     return list(res.scalars().all())
+
+
+async def calculate_market_price_stats(
+    session: AsyncSession,
+    model: str,
+    year: Optional[int],
+    generation: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Computes average and median price for cars of similar model/year to detect below-market deals.
+    """
+    from sqlalchemy import func
+    stmt = select(func.avg(ListingModel.price_usd), func.count(ListingModel.id)).where(
+        ListingModel.brand == "Audi",
+        ListingModel.price_usd > 500,
+    )
+    if model:
+        stmt = stmt.where(ListingModel.model == model)
+    if generation:
+        stmt = stmt.where(ListingModel.generation == generation)
+    if year:
+        # Window of +/- 1 year
+        stmt = stmt.where(ListingModel.year.between(year - 1, year + 1))
+
+    res = await session.execute(stmt)
+    avg_price, total_count = res.one_or_none() or (None, 0)
+    return {
+        "avg_price_usd": float(avg_price) if avg_price else None,
+        "sample_size": total_count or 0,
+    }
+
+
+async def get_seller_ad_count(
+    session: AsyncSession,
+    seller_phone: Optional[str] = None,
+    seller_name: Optional[str] = None,
+) -> int:
+    """
+    Counts how many vehicles this seller (phone or name) has published in the database.
+    """
+    from sqlalchemy import func, or_
+    conditions = []
+    if seller_phone:
+        conditions.append(ListingModel.seller_phone == seller_phone)
+    if seller_name and len(seller_name) > 3:
+        conditions.append(ListingModel.seller == seller_name)
+
+    if not conditions:
+        return 0
+
+    stmt = select(func.count(ListingModel.id)).where(or_(*conditions))
+    res = await session.execute(stmt)
+    count_val = res.scalar_one_or_none()
+    return count_val or 0

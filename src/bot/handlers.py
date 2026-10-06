@@ -229,6 +229,16 @@ class BotHandler:
                     tr_val = data.split(":", 1)[1]
                     uf.transmission = tr_val
 
+                # 4.1 Drive type
+                elif data.startswith("set_drive:"):
+                    dr_val = data.split(":", 1)[1]
+                    uf.drive_type = dr_val
+
+                # 4.2 Body type
+                elif data.startswith("set_body:"):
+                    bd_val = data.split(":", 1)[1]
+                    uf.body_type = bd_val
+
                 # 5. Mileage prompt & reset
                 elif data == "prompt_mileage":
                     self.user_states[chat_id] = "awaiting_mileage"

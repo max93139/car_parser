@@ -39,7 +39,11 @@ from src.parsers.instagram import InstagramParser
 from src.parsers.olx import OlxParser
 from src.parsers.rst import RstParser
 from src.parsers.telegram import TelegramChannelParser
-from src.database.repository import get_or_create_user_filter
+from src.database.repository import (
+    calculate_market_price_stats,
+    get_or_create_user_filter,
+    get_seller_ad_count,
+)
 from src.filtering.user_filter import matches_user_filter
 from src.services.deduplicator import Deduplicator
 
@@ -244,8 +248,22 @@ class PipelineRunner:
                     logger.debug("[runner] Failed to check custom user filter: %s", uf_err)
 
             if should_send:
+                # Calculate market price statistics & dealer history
+                stats = await calculate_market_price_stats(
+                    session, model=listing.model, year=listing.year, generation=listing.generation
+                )
+                seller_count = await get_seller_ad_count(
+                    session, seller_phone=listing.seller_phone, seller_name=listing.seller
+                )
+
+                meta_info: Dict[str, Any] = {
+                    "avg_price_usd": stats.get("avg_price_usd"),
+                    "sample_size": stats.get("sample_size"),
+                    "seller_ad_count": seller_count,
+                }
+
                 if action == "CREATED":
-                    sent = await notifier.send_listing_alert(listing, session=session)
+                    sent = await notifier.send_listing_alert(listing, price_drop_info=meta_info, session=session)
                     if sent:
                         notified = True
                         if dedup_res.listing_id:
@@ -259,14 +277,14 @@ class PipelineRunner:
 
                 elif dedup_res.is_price_drop:
                     old_price_usd = (listing.price_usd or 0.0) - (dedup_res.price_diff_usd or 0.0)
-                    price_drop_info = {
+                    meta_info.update({
                         "is_price_drop": True,
                         "old_price_usd": old_price_usd,
                         "new_price_usd": listing.price_usd or 0.0,
                         "diff_usd": dedup_res.price_diff_usd,
-                    }
+                    })
                     sent = await notifier.send_listing_alert(
-                        listing, price_drop_info=price_drop_info, session=session
+                        listing, price_drop_info=meta_info, session=session
                     )
                     if sent:
                         notified = True

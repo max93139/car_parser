@@ -45,6 +45,21 @@ def format_filter_summary(uf: UserFilterModel) -> str:
     }
     trans_str = trans_map.get(uf.transmission, "Будь-яка")
 
+    # Drive & Body
+    drive_map = {
+        "any": "Будь-який",
+        "quattro": "Тільки Quattro (4x4) ⚡️",
+        "front": "Тільки передній 🚗",
+    }
+    drive_str = drive_map.get(getattr(uf, "drive_type", "any"), "Будь-який")
+
+    body_map = {
+        "any": "Будь-який",
+        "sedan": "Седан 🏎",
+        "avant": "Універсал (Avant) 🚙",
+    }
+    body_str = body_map.get(getattr(uf, "body_type", "any"), "Будь-який")
+
     # Mileage
     mil_str = f"до {uf.max_mileage:,} км" if uf.max_mileage else "не обмежено"
 
@@ -58,6 +73,8 @@ def format_filter_summary(uf: UserFilterModel) -> str:
         f"💰 <b>Ціна:</b> {price_str}\n"
         f"📅 <b>Роки:</b> {year_str}\n"
         f"🕹 <b>КПП:</b> {trans_str}\n"
+        f"⚡️ <b>Привід:</b> {drive_str}\n"
+        f"🚙 <b>Кузов:</b> {body_str}\n"
         f"🛣 <b>Пробіг:</b> {mil_str}\n"
         f"🛠 <b>Стан:</b> {cond_str}\n\n"
         "<i>Натискайте кнопки нижче, щоб змінити параметри:</i>"
@@ -116,6 +133,22 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
         {"text": f"{'🔘 ' if tr == 'automatic' else ''}Автомат", "callback_data": "set_trans:automatic"},
     ]
 
+    # 4.1 Drive type row
+    dr = getattr(uf, "drive_type", "any") or "any"
+    drive_buttons = [
+        {"text": f"{'🔘 ' if dr == 'any' else ''}Будь-який привід", "callback_data": "set_drive:any"},
+        {"text": f"{'🔘 ' if dr == 'quattro' else ''}Quattro ⚡️", "callback_data": "set_drive:quattro"},
+        {"text": f"{'🔘 ' if dr == 'front' else ''}Передній", "callback_data": "set_drive:front"},
+    ]
+
+    # 4.2 Body type row
+    bd = getattr(uf, "body_type", "any") or "any"
+    body_buttons = [
+        {"text": f"{'🔘 ' if bd == 'any' else ''}Будь-який кузов", "callback_data": "set_body:any"},
+        {"text": f"{'🔘 ' if bd == 'sedan' else ''}Седан 🏎", "callback_data": "set_body:sedan"},
+        {"text": f"{'🔘 ' if bd == 'avant' else ''}Avant (універсал) 🚙", "callback_data": "set_body:avant"},
+    ]
+
     # 5. Mileage row (typing number instead of preset buttons)
     mil_buttons = [
         {"text": "🛣 Вказати пробіг (вписати числом)", "callback_data": "prompt_mileage"},
@@ -154,6 +187,8 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
             eng_buttons,
             price_buttons,
             trans_buttons,
+            drive_buttons,
+            body_buttons,
             mil_buttons,
             years_buttons,
             cond_buttons,
