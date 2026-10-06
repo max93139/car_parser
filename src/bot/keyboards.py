@@ -73,24 +73,12 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
             "callback_data": f"toggle_eng:{eng.replace(' ', '')}",
         })
 
-    # 2. Price Min row
-    pmin_val = uf.min_price
-    pmin_buttons = [
-        {"text": f"{'🔘 ' if not pmin_val else ''}Мін: Будь-яка", "callback_data": "set_pmin:none"},
-        {"text": f"{'🔘 ' if pmin_val == 2000 else ''}$2000", "callback_data": "set_pmin:2000"},
-        {"text": f"{'🔘 ' if pmin_val == 3000 else ''}$3000", "callback_data": "set_pmin:3000"},
-        {"text": f"{'🔘 ' if pmin_val == 4000 else ''}$4000", "callback_data": "set_pmin:4000"},
+    # 2. Price row (inscribing / typing instead of preset buttons)
+    price_buttons = [
+        {"text": "✏️ Вказати ціну (вписати текстом)", "callback_data": "prompt_price"},
     ]
-
-    # 3. Price Max row
-    pmax_val = uf.max_price
-    pmax_buttons = [
-        {"text": f"{'🔘 ' if not pmax_val else ''}Макс: Будь-яка", "callback_data": "set_pmax:none"},
-        {"text": f"{'🔘 ' if pmax_val == 4000 else ''}$4000", "callback_data": "set_pmax:4000"},
-        {"text": f"{'🔘 ' if pmax_val == 5000 else ''}$5000", "callback_data": "set_pmax:5000"},
-        {"text": f"{'🔘 ' if pmax_val == 6000 else ''}$6000", "callback_data": "set_pmax:6000"},
-        {"text": f"{'🔘 ' if pmax_val == 7000 else ''}$7000", "callback_data": "set_pmax:7000"},
-    ]
+    if uf.min_price or uf.max_price:
+        price_buttons.append({"text": "❌ Скинути ціну", "callback_data": "reset_price"})
 
     # 4. Transmission row
     tr = uf.transmission or "any"
@@ -136,8 +124,7 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
     return {
         "inline_keyboard": [
             eng_buttons,
-            pmin_buttons,
-            pmax_buttons,
+            price_buttons,
             trans_buttons,
             mil_buttons,
             years_buttons,

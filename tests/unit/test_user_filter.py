@@ -164,6 +164,34 @@ def test_keyboards_generation():
     assert "❌ 2.4" in texts
     assert "✅ 1.9 TDI" in texts
 
+    # Second row is price
+    price_row = rows[1]
+    assert "Вказати ціну" in price_row[0]["text"]
+
+
+def test_parse_price_input():
+    from src.bot.price_parser import parse_price_input
+
+    # Range
+    assert parse_price_input("3500-5500") == (3500, 5500)
+    assert parse_price_input("3000 - 6000$") == (3000, 6000)
+    assert parse_price_input("3500 5500") == (3500, 5500)
+    assert parse_price_input("3.5k - 5k") == (3500, 5000)
+
+    # Upper bound
+    assert parse_price_input("до 5000") == (None, 5000)
+    assert parse_price_input("5000$") == (None, 5000)
+    assert parse_price_input("4800") == (None, 4800)
+
+    # Lower bound
+    assert parse_price_input("від 3000") == (3000, None)
+    assert parse_price_input("> 3500") == (3500, None)
+
+    # Reset
+    assert parse_price_input("0") == (None, None)
+    assert parse_price_input("скинути") == (None, None)
+    assert parse_price_input("будь-яка") == (None, None)
+
 
 @pytest.mark.asyncio
 async def test_repository_user_filters_crud():

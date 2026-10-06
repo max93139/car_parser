@@ -14,6 +14,7 @@ from src.bot.keyboards import (
     build_settings_keyboard,
     format_filter_summary,
 )
+from src.bot.price_parser import parse_price_input
 from src.database.connection import get_session_factory
 from src.database.models import UserFilterModel
 from src.database.repository import (
@@ -174,15 +175,25 @@ class BotHandler:
                     if not alert_text:
                         uf.engines = current_engines
 
-                # 2. Min price
-                elif data.startswith("set_pmin:"):
-                    val_str = data.split(":", 1)[1]
-                    uf.min_price = None if val_str == "none" else int(val_str)
+                # 2. Price prompt & reset
+                elif data == "prompt_price":
+                    await self.answer_callback(callback_id)
+                    await self.send_message(
+                        chat_id,
+                        "✍️ <b>Введіть бажану ціну у повідомленні</b>:\n\n"
+                        "Наприклад:\n"
+                        "• Діапазон: <code>3500-5500</code> або <code>3500 5500</code>\n"
+                        "• Тільки максимальна: <code>до 5000</code> або <code>5000</code>\n"
+                        "• Тільки мінімальна: <code>від 3000</code>\n"
+                        "• Зняти обмеження: <code>0</code>\n\n"
+                        "<i>Просто надішліть повідомлення з ціною сюди в чат 👇</i>",
+                    )
+                    return
 
-                # 3. Max price
-                elif data.startswith("set_pmax:"):
-                    val_str = data.split(":", 1)[1]
-                    uf.max_price = None if val_str == "none" else int(val_str)
+                elif data == "reset_price":
+                    uf.min_price = None
+                    uf.max_price = None
+                    alert_text = "Обмеження за ціною знято!"
 
                 # 4. Transmission
                 elif data.startswith("set_trans:"):
@@ -249,3 +260,51 @@ class BotHandler:
                 summary = format_filter_summary(uf)
                 kb = build_settings_keyboard(uf)
                 await self.edit_message_text(chat_id, message_id, summary, reply_markup=kb)
+
+    async def handle_text_message(self, chat_id: str, text: str) -> None:
+        """Handles incoming text messages, including typed prices."""
+        clean_text = text.strip()
+        if clean_text in ("/start", "/help"):
+            await self.handle_start(chat_id)
+            return
+        if clean_text in ("/settings", "/filters", "/filter"):
+            await self.handle_settings(chat_id)
+            return
+
+        parsed_price = parse_price_input(clean_text)
+        if parsed_price is not None:
+            min_p, max_p = parsed_price
+            factory = get_session_factory()
+            async with factory() as session:
+                async with session.begin():
+                    uf = await get_or_create_user_filter(session, chat_id)
+                    uf.min_price = min_p
+                    uf.max_price = max_p
+                    await session.flush()
+
+                    summary = format_filter_summary(uf)
+                    kb = build_settings_keyboard(uf)
+
+                    if min_p is None and max_p is None:
+                        msg = "✅ <b>Обмеження за ціною знято!</b>"
+                    elif min_p is not None and max_p is not None:
+                        msg = f"✅ <b>Встановлено ціну: від ${min_p:,} до ${max_p:,}!</b>"
+                    elif max_p is not None:
+                        msg = f"✅ <b>Встановлено макс. ціну: до ${max_p:,}!</b>"
+                    else:
+                        msg = f"✅ <b>Встановлено мін. ціну: від ${min_p:,}!</b>"
+
+                    await self.send_message(
+                        chat_id,
+                        f"{msg}\n\n{summary}",
+                        reply_markup=kb,
+                    )
+            return
+
+        # Unknown message fallback
+        await self.send_message(
+            chat_id,
+            "Не вдалося розпізнати значення ціни.\n"
+            "Спробуйте написати у форматі: <code>3500-5000</code> або <code>до 5000</code>.\n"
+            "Або надішліть /settings для відкриття меню налаштувань.",
+        )

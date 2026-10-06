@@ -81,10 +81,8 @@ class BotListener:
                             chat_id = str(msg.get("chat", {}).get("id", ""))
                             text = (msg.get("text") or "").strip()
 
-                            if text in ("/start", "/help"):
-                                await handler.handle_start(chat_id)
-                            elif text in ("/settings", "/filters", "/filter"):
-                                await handler.handle_settings(chat_id)
+                            if text:
+                                await handler.handle_text_message(chat_id, text)
 
                         # 2. Callback query update
                         elif "callback_query" in upd:
