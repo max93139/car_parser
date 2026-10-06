@@ -51,7 +51,7 @@ class AutoRiaParser(BaseParser):
                 "model.id[0]": "49",        # A6
                 "model.id[1]": "39",        # A4
                 "year[0].gte": "1994",
-                "year[0].lte": "2018",
+                "year[0].lte": "2015",
                 "order_by": "2",            # Newest first
                 "page": str(page),
             }
@@ -241,8 +241,10 @@ class AutoRiaParser(BaseParser):
                 gen_val = "C5"
             elif "C6" in full_card_text or (year_val and 2004 <= year_val <= 2011):
                 gen_val = "C6"
-            elif "C7" in full_card_text or (year_val and 2011 <= year_val <= 2018):
+            elif "C7" in full_card_text or (year_val and 2011 <= year_val <= 2015):
                 gen_val = "C7"
+            if year_val and year_val > 2015:
+                year_val = 2015
         elif model_name == "A4":
             if "B5" in full_card_text or (year_val and year_val < 2001):
                 gen_val = "B5"
