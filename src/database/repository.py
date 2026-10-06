@@ -1,0 +1,145 @@
+"""
+Repository operations for user filters and custom listing queries.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+import logging
+from typing import Any, Dict, List, Optional
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.database.models import ListingModel, UserFilterModel
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_ENGINES = ["1.8T", "2.4", "1.9 TDI"]
+
+
+async def get_or_create_user_filter(session: AsyncSession, chat_id: str) -> UserFilterModel:
+    """
+    Retrieves user filter configuration by chat_id or creates a new default one.
+    """
+    stmt = select(UserFilterModel).where(UserFilterModel.chat_id == str(chat_id))
+    result = await session.execute(stmt)
+    user_filter = result.scalar_one_or_none()
+
+    if user_filter is None:
+        user_filter = UserFilterModel(
+            chat_id=str(chat_id),
+            engines=list(DEFAULT_ENGINES),
+            min_price=None,
+            max_price=None,
+            min_year=1997,
+            max_year=2005,
+            max_mileage=None,
+            transmission="any",
+            exclude_damaged=True,
+        )
+        session.add(user_filter)
+        await session.flush()
+
+    return user_filter
+
+
+async def update_user_filter(
+    session: AsyncSession,
+    chat_id: str,
+    **updates: Any,
+) -> UserFilterModel:
+    """
+    Updates specific fields in user_filters record.
+    """
+    user_filter = await get_or_create_user_filter(session, chat_id)
+    for key, value in updates.items():
+        if hasattr(user_filter, key):
+            setattr(user_filter, key, value)
+
+    user_filter.updated_at = datetime.now(timezone.utc)
+    await session.flush()
+    return user_filter
+
+
+async def reset_user_filter(session: AsyncSession, chat_id: str) -> UserFilterModel:
+    """
+    Resets user filter to default factory values.
+    """
+    return await update_user_filter(
+        session,
+        chat_id,
+        engines=list(DEFAULT_ENGINES),
+        min_price=None,
+        max_price=None,
+        min_year=1997,
+        max_year=2005,
+        max_mileage=None,
+        transmission="any",
+        exclude_damaged=True,
+    )
+
+
+async def find_matching_listings(
+    session: AsyncSession,
+    user_filter: UserFilterModel,
+    limit: int = 5,
+) -> List[ListingModel]:
+    """
+    Finds the most recent listings matching user's custom filter criteria.
+    """
+    stmt = select(ListingModel).where(
+        ListingModel.brand == "Audi",
+        ListingModel.model == "A6",
+        ListingModel.generation == "C5",
+    )
+
+    # 1. Price filters
+    if user_filter.min_price is not None:
+        stmt = stmt.where(ListingModel.price >= user_filter.min_price)
+    if user_filter.max_price is not None:
+        stmt = stmt.where(ListingModel.price <= user_filter.max_price)
+
+    # 2. Year filters
+    if user_filter.min_year is not None:
+        stmt = stmt.where(ListingModel.year >= user_filter.min_year)
+    if user_filter.max_year is not None:
+        stmt = stmt.where(ListingModel.year <= user_filter.max_year)
+
+    # 3. Mileage filter
+    if user_filter.max_mileage is not None:
+        stmt = stmt.where(
+            (ListingModel.mileage <= user_filter.max_mileage) | (ListingModel.mileage.is_(None))
+        )
+
+    # 4. Transmission
+    if user_filter.transmission == "manual":
+        stmt = stmt.where(
+            ListingModel.transmission.in_(["механіка", "manual", "механика"])
+        )
+    elif user_filter.transmission == "automatic":
+        stmt = stmt.where(
+            ListingModel.transmission.in_(["автомат", "automatic", "типроник", "варіатор"])
+        )
+
+    # 5. Engines
+    active_engines = user_filter.engines or DEFAULT_ENGINES
+    if active_engines:
+        engine_conditions = []
+        for eng in active_engines:
+            if "1.8" in eng:
+                engine_conditions.append(ListingModel.engine.ilike("%1.8%"))
+                engine_conditions.append(ListingModel.engine_code == "1.8T")
+            elif "2.4" in eng:
+                engine_conditions.append(ListingModel.engine.ilike("%2.4%"))
+                engine_conditions.append(ListingModel.engine_code == "2.4")
+            elif "1.9" in eng:
+                engine_conditions.append(ListingModel.engine.ilike("%1.9%"))
+                engine_conditions.append(ListingModel.engine_code == "1.9TDI")
+
+        if engine_conditions:
+            from sqlalchemy import or_
+            stmt = stmt.where(or_(*engine_conditions))
+
+    stmt = stmt.order_by(ListingModel.first_seen_at.desc()).limit(limit)
+    res = await session.execute(stmt)
+    return list(res.scalars().all())

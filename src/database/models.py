@@ -259,3 +259,34 @@ class ParserRunModel(Base):
     source: Mapped[SourceModel] = relationship(
         "SourceModel", back_populates="parser_runs", lazy="selectin"
     )
+
+
+class UserFilterModel(Base):
+    """
+    User customizable search preferences and filter toggles per Telegram chat.
+    """
+    __tablename__ = "user_filters"
+
+    chat_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    engines: Mapped[list[str]] = mapped_column(JSONType, default=lambda: ["1.8T", "2.4", "1.9 TDI"], nullable=False)
+    min_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_year: Mapped[Optional[int]] = mapped_column(Integer, default=1997, nullable=True)
+    max_year: Mapped[Optional[int]] = mapped_column(Integer, default=2005, nullable=True)
+    max_mileage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    transmission: Mapped[str] = mapped_column(String(32), default="any", nullable=False)
+    exclude_damaged: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+

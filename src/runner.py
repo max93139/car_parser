@@ -39,6 +39,8 @@ from src.parsers.instagram import InstagramParser
 from src.parsers.olx import OlxParser
 from src.parsers.rst import RstParser
 from src.parsers.telegram import TelegramChannelParser
+from src.database.repository import get_or_create_user_filter
+from src.filtering.user_filter import matches_user_filter
 from src.services.deduplicator import Deduplicator
 
 # Configure structured logging
@@ -232,6 +234,14 @@ class PipelineRunner:
             # Check review settings
             if listing.status == "NEEDS_REVIEW" and not self.settings.telegram_bot.send_needs_review:
                 should_send = False
+
+            if should_send and self.settings.telegram_bot.chat_id:
+                try:
+                    user_filter = await get_or_create_user_filter(session, self.settings.telegram_bot.chat_id)
+                    if not matches_user_filter(listing, user_filter):
+                        should_send = False
+                except Exception as uf_err:
+                    logger.debug("[runner] Failed to check custom user filter: %s", uf_err)
 
             if should_send:
                 if action == "CREATED":
