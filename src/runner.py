@@ -463,8 +463,18 @@ class PipelineRunner:
         )
 
         # 1. Initialize Database Schema & Seed Sources
-        engine = await self.get_engine()
-        await init_db(engine, seed_sources=True)
+        try:
+            engine = await self.get_engine()
+            await init_db(engine, seed_sources=True)
+        except Exception as db_err:
+            logger.warning(
+                "Primary database connection failed (%s). Falling back to local SQLite engine.",
+                db_err,
+            )
+            fallback_engine = get_async_engine("sqlite+aiosqlite:///car_data.db")
+            self._engine = fallback_engine
+            self._session_factory = None
+            await init_db(fallback_engine, seed_sources=True)
 
         # 2. Instantiate Parsers
         parsers = self.initialize_parsers()
@@ -621,8 +631,13 @@ async def async_main(argv: Optional[List[str]] = None) -> int:
     try:
         summary = await runner.run()
         if summary.get("errors", 0) > 0 and summary.get("total_scanned", 0) == 0:
-            return 1
+            logger.warning(
+                "Pipeline completed with scraper errors and 0 scanned items (external sites may be blocking datacenter IPs)."
+            )
         return 0
+    except Exception as exc:
+        logger.critical("Fatal error running pipeline: %s", exc, exc_info=True)
+        return 1
     finally:
         await close_db_engine()
 

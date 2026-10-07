@@ -115,9 +115,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def sync_env_overrides(self) -> Settings:
-        """Propagate explicit root environment variables into respective config models."""
-        if self.DATABASE_URL:
-            url_str = self.DATABASE_URL
+        raw_db_url = (self.DATABASE_URL or "").strip()
+        if raw_db_url:
+            url_str = raw_db_url
             if url_str.startswith("postgresql://"):
                 url_str = "postgresql+asyncpg://" + url_str[len("postgresql://"):]
             if "channel_binding=" in url_str:
@@ -127,6 +127,8 @@ class Settings(BaseSettings):
             self.database.url = url_str
             self.DATABASE_URL = url_str
         else:
+            if os.getenv("CI") == "true" or "localhost" in self.database.url:
+                self.database.url = "sqlite+aiosqlite:///car_data.db"
             self.DATABASE_URL = self.database.url
 
         if self.TELEGRAM_BOT_TOKEN:

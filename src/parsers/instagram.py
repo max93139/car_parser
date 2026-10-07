@@ -66,6 +66,7 @@ class InstagramParser(BaseParser):
             self.stats.finish(status="SUCCESS")
             return
 
+        consecutive_auth_failures = 0
         for account in self.accounts:
             username = account.lstrip("@").strip()
             if not username:
@@ -87,6 +88,13 @@ class InstagramParser(BaseParser):
                         response.status_code, username
                     )
                     self.stats.status = "DEGRADED"
+                    consecutive_auth_failures += 1
+                    if consecutive_auth_failures >= 3:
+                        logger.warning(
+                            "[instagram] Consecutive login walls/401 encountered (%d). Halting Instagram scraper to conserve quota.",
+                            consecutive_auth_failures,
+                        )
+                        break
                     continue
 
                 # Check HTML response for login wall challenge
@@ -97,7 +105,16 @@ class InstagramParser(BaseParser):
                         username
                     )
                     self.stats.status = "DEGRADED"
+                    consecutive_auth_failures += 1
+                    if consecutive_auth_failures >= 3:
+                        logger.warning(
+                            "[instagram] Consecutive login walls/401 encountered (%d). Halting Instagram scraper to conserve quota.",
+                            consecutive_auth_failures,
+                        )
+                        break
                     continue
+
+                consecutive_auth_failures = 0
 
                 try:
                     data = response.json()
