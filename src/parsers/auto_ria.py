@@ -245,8 +245,6 @@ class AutoRiaParser(BaseParser):
                 gen_val = "C6"
             elif "C7" in full_card_text or (year_val and 2011 <= year_val <= 2015):
                 gen_val = "C7"
-            if year_val and year_val > 2015:
-                year_val = 2015
         elif model_name == "A4":
             if "B5" in full_card_text or (year_val and year_val < 2001):
                 gen_val = "B5"
@@ -256,6 +254,9 @@ class AutoRiaParser(BaseParser):
                 gen_val = "B7"
             elif "B8" in full_card_text or (year_val and 2008 <= year_val <= 2015):
                 gen_val = "B8"
+
+        if year_val and year_val > 2015:
+            year_val = 2015
 
         # 10. Drive type & Body type
         raw_drive = "front"
