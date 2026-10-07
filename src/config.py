@@ -127,8 +127,6 @@ class Settings(BaseSettings):
             self.database.url = url_str
             self.DATABASE_URL = url_str
         else:
-            if os.getenv("CI") == "true" or "localhost" in self.database.url:
-                self.database.url = "sqlite+aiosqlite:///car_data.db"
             self.DATABASE_URL = self.database.url
 
         if self.TELEGRAM_BOT_TOKEN:
