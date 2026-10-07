@@ -232,3 +232,46 @@ async def get_seller_ad_count(
     res = await session.execute(stmt)
     count_val = res.scalar_one_or_none()
     return count_val or 0
+
+
+async def get_market_overview(session: AsyncSession) -> Dict[str, Any]:
+    """
+    Computes an analytical overview of active listings, models, price points, and sources.
+    """
+    from sqlalchemy import func
+
+    stats_stmt = select(
+        func.count(ListingModel.id),
+        func.avg(ListingModel.price_usd),
+        func.min(ListingModel.price_usd),
+        func.max(ListingModel.price_usd),
+    ).where(ListingModel.brand == "Audi", ListingModel.price_usd.isnot(None), ListingModel.price_usd > 300)
+    res = await session.execute(stats_stmt)
+    total, avg_p, min_p, max_p = res.one_or_none() or (0, None, None, None)
+
+    model_stmt = (
+        select(ListingModel.model, ListingModel.generation, func.count(ListingModel.id))
+        .where(ListingModel.brand == "Audi")
+        .group_by(ListingModel.model, ListingModel.generation)
+        .order_by(func.count(ListingModel.id).desc())
+        .limit(6)
+    )
+    model_res = await session.execute(model_stmt)
+    models = [(f"Audi {row[0]} {row[1]}".strip(), row[2]) for row in model_res.all()]
+
+    source_stmt = (
+        select(ListingModel.source_id, func.count(ListingModel.id))
+        .group_by(ListingModel.source_id)
+        .order_by(func.count(ListingModel.id).desc())
+    )
+    source_res = await session.execute(source_stmt)
+    sources = [(row[0], row[1]) for row in source_res.all()]
+
+    return {
+        "total": total or 0,
+        "avg_price": float(avg_p) if avg_p else None,
+        "min_price": float(min_p) if min_p else None,
+        "max_price": float(max_p) if max_p else None,
+        "models": models,
+        "sources": sources,
+    }

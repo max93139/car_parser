@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.bot.keyboards import (
     ALL_ENGINES,
+    build_main_reply_keyboard,
     build_settings_keyboard,
     format_filter_summary,
 )
@@ -19,11 +20,12 @@ from src.database.connection import get_session_factory
 from src.database.models import UserFilterModel
 from src.database.repository import (
     find_matching_listings,
+    get_market_overview,
     get_or_create_user_filter,
     reset_user_filter,
     update_user_filter,
 )
-from src.notifier.templates import format_listing_caption
+from src.notifier.templates import format_listing_caption, format_market_overview
 
 logger = logging.getLogger(__name__)
 
@@ -107,23 +109,34 @@ class BotHandler:
         parse_mode: str = "HTML",
     ) -> bool:
         """Sends a single photo with caption."""
-        payload: Dict[str, Any] = {
-            "chat_id": chat_id,
-            "photo": photo_url,
-            "caption": caption,
-            "parse_mode": parse_mode,
-        }
-        resp = await self.client.post(f"{self.api_url}/sendPhoto", json=payload)
-        return resp.status_code == 200
+        try:
+            payload: Dict[str, Any] = {
+                "chat_id": chat_id,
+                "photo": photo_url,
+                "caption": caption,
+                "parse_mode": parse_mode,
+            }
+            resp = await self.client.post(f"{self.api_url}/sendPhoto", json=payload)
+            if resp.status_code == 200:
+                return True
+            logger.warning("[bot] sendPhoto failed: %s %s (url: %s)", resp.status_code, resp.text, photo_url)
+            return False
+        except Exception as exc:
+            logger.warning("[bot] sendPhoto exception: %s (url: %s)", exc, photo_url)
+            return False
 
     async def handle_start(self, chat_id: str) -> None:
         """Handles /start command."""
         welcome_text = (
-            "👋 <b>Вітаю в моніторингу Audi A6 C5!</b>\n\n"
-            "Цей бот автоматично знаходить найкращі пропозиції Audi A6 C5 "
+            "👋 <b>Вітаю в моніторингу авто Audi!</b>\n\n"
+            "Цей бот автоматично знаходить найкращі пропозиції Audi A6 та A4 "
             "по всій Україні (AUTO.RIA, OLX, RST, Telegram-канали та Instagram).\n\n"
-            "Ви можете налаштувати пошук під власні критерії (мотори, ціну, пробіг, КПП).\n\n"
-            "Натисніть /settings, щоб відкрити панель налаштувань!"
+            "Використовуйте кнопки постійного меню внизу екрана для швидкого керування ботом!"
+        )
+        await self.send_message(
+            chat_id,
+            welcome_text,
+            reply_markup=build_main_reply_keyboard(),
         )
         factory = get_session_factory()
         async with factory() as session:
@@ -131,10 +144,10 @@ class BotHandler:
                 uf = await get_or_create_user_filter(session, chat_id)
                 summary = format_filter_summary(uf)
                 kb = build_settings_keyboard(uf)
-                await self.send_message(chat_id, f"{welcome_text}\n\n{summary}", reply_markup=kb)
+                await self.send_message(chat_id, summary, reply_markup=kb)
 
     async def handle_settings(self, chat_id: str) -> None:
-        """Handles /settings command."""
+        """Handles /settings command or settings button."""
         factory = get_session_factory()
         async with factory() as session:
             async with session.begin():
@@ -142,6 +155,119 @@ class BotHandler:
                 summary = format_filter_summary(uf)
                 kb = build_settings_keyboard(uf)
                 await self.send_message(chat_id, summary, reply_markup=kb)
+
+    async def handle_help(self, chat_id: str) -> None:
+        """Handles /help command or help button."""
+        help_text = (
+            "ℹ️ <b>Як користуватися ботом Audi Monitor:</b>\n\n"
+            "🔍 <b>Знайти авто зараз</b> — швидкий пошук останніх оголошень за вашими фільтрами.\n"
+            "⚙️ <b>Налаштування фільтрів</b> — налаштувати моделі (A6 C4-C7, A4 B5-B8), мотори, КПП, Quattro, кузов, бюджет і пробіг.\n"
+            "📊 <b>Статистика ринку</b> — поточний огляд цін та кількості авто в базі.\n"
+            "🚀 <b>Boost пошук</b> (/boost) — прискорений пошук найсвіжіших пропозицій.\n"
+            "🔄 <b>Скинути фільтри</b> — скинути параметри пошуку до початкових.\n\n"
+            "💡 <i>Ви також можете надіслати в чат бажану ціну (наприклад: <code>3500-5000</code>) або пробіг (<code>до 250 тис</code>)!</i>"
+        )
+        await self.send_message(
+            chat_id,
+            help_text,
+            reply_markup=build_main_reply_keyboard(),
+        )
+
+    async def handle_market_stats(self, chat_id: str) -> None:
+        """Handles market statistics display."""
+        factory = get_session_factory()
+        async with factory() as session:
+            async with session.begin():
+                stats = await get_market_overview(session)
+                text = format_market_overview(stats)
+                await self.send_message(
+                    chat_id,
+                    text,
+                    reply_markup=build_main_reply_keyboard(),
+                )
+
+    async def handle_reset(self, chat_id: str) -> None:
+        """Handles filter reset from reply keyboard or command."""
+        factory = get_session_factory()
+        async with factory() as session:
+            async with session.begin():
+                uf = await reset_user_filter(session, chat_id)
+                summary = format_filter_summary(uf)
+                kb = build_settings_keyboard(uf)
+                await self.send_message(
+                    chat_id,
+                    "🔄 <b>Фільтри скинуто до початкових!</b>",
+                    reply_markup=build_main_reply_keyboard(),
+                )
+                await self.send_message(chat_id, summary, reply_markup=kb)
+
+    async def execute_search(self, chat_id: str, is_boost: bool = False) -> None:
+        """Executes search for matching listings according to user filters."""
+        if is_boost:
+            await self.send_message(
+                chat_id,
+                "🚀 <b>Режим BOOST активовано!</b>\nШукаю найактуальніші пропозиції за вашими критеріями...",
+                reply_markup=build_main_reply_keyboard(),
+            )
+
+        factory = get_session_factory()
+        async with factory() as session:
+            async with session.begin():
+                uf = await get_or_create_user_filter(session, chat_id)
+                listings = await find_matching_listings(session, uf, limit=5)
+                if not listings:
+                    await self.send_message(
+                        chat_id,
+                        "🔍 <b>За вашими критеріями зараз немає збережених нових оголошень.</b>\n\n"
+                        "💡 <i>Спробуйте розширити параметри у налаштуваннях або зачекайте — "
+                        "щойно з'явиться відповідне авто, бот миттєво надішле його вам!</i>",
+                        reply_markup=build_main_reply_keyboard(),
+                    )
+                    return
+
+                await self.send_message(
+                    chat_id,
+                    f"🔍 <b>Знайдено {len(listings)} останніх пропозицій за вашими фільтрами:</b>",
+                    reply_markup=build_main_reply_keyboard(),
+                )
+                for item in listings:
+                    try:
+                        caption = format_listing_caption(item)
+                        images = getattr(item, "images", []) or []
+                        if isinstance(images, str):
+                            try:
+                                import json
+                                images = json.loads(images)
+                            except Exception:
+                                images = [images] if images.startswith("http") else []
+                        if not isinstance(images, list):
+                            images = []
+
+                        first_photo = next(
+                            (img for img in images if isinstance(img, str) and img.startswith("http")),
+                            None,
+                        )
+
+                        sent = False
+                        if first_photo:
+                            sent = await self.send_photo(chat_id, first_photo, caption)
+                            if not sent:
+                                logger.warning(
+                                    "[bot] send_photo failed for listing %s, falling back to sendMessage",
+                                    getattr(item, "id", None),
+                                )
+                        if not sent:
+                            await self.send_message(
+                                chat_id,
+                                caption,
+                                reply_markup=build_main_reply_keyboard(),
+                            )
+                    except Exception as exc:
+                        logger.exception(
+                            "[bot] Error rendering/sending listing %s: %s",
+                            getattr(item, "id", None),
+                            exc,
+                        )
 
     async def handle_callback_query(
         self,
@@ -283,27 +409,7 @@ class BotHandler:
                 # 9. Search action
                 elif data == "action_search":
                     await self.answer_callback(callback_id, "Шукаю авто за вашими критеріями...")
-                    listings = await find_matching_listings(session, uf, limit=5)
-                    if not listings:
-                        await self.send_message(
-                            chat_id,
-                            "🔍 <b>За вашими критеріями зараз немає збережених нових оголошень.</b>\n"
-                            "Як тільки з'явиться підходяща машина — бот миттєво надішле її вам!",
-                        )
-                    else:
-                        await self.send_message(
-                            chat_id,
-                            f"🔍 <b>Знайдено {len(listings)} останніх пропозицій за вашими фільтрами:</b>",
-                        )
-                        for item in listings:
-                            caption = format_listing_caption(item)
-                            images = item.images if isinstance(item.images, list) else []
-                            if images and images[0].startswith("http"):
-                                sent = await self.send_photo(chat_id, images[0], caption)
-                                if not sent:
-                                    await self.send_message(chat_id, caption)
-                            else:
-                                await self.send_message(chat_id, caption)
+                    await self.execute_search(chat_id)
                     return
 
                 await session.flush()
@@ -315,13 +421,36 @@ class BotHandler:
                 await self.edit_message_text(chat_id, message_id, summary, reply_markup=kb)
 
     async def handle_text_message(self, chat_id: str, text: str) -> None:
-        """Handles incoming text messages, including typed prices and mileages."""
+        """Handles incoming text messages, commands, and persistent menu buttons."""
         clean_text = text.strip()
-        if clean_text in ("/start", "/help"):
+
+        # 0. Navigation and Persistent Menu Commands
+        if clean_text in ("/start",):
             await self.handle_start(chat_id)
             return
-        if clean_text in ("/settings", "/filters", "/filter"):
+
+        if clean_text in ("/help", "ℹ️ Допомога", "ℹ️ Про бота / Допомога", "допомога", "help"):
+            await self.handle_help(chat_id)
+            return
+
+        if clean_text in ("/settings", "/filters", "/filter", "⚙️ Налаштування фільтрів", "налаштування", "фільтри"):
             await self.handle_settings(chat_id)
+            return
+
+        if clean_text in ("/search", "/find", "🔍 Знайти авто зараз", "знайти авто", "пошук"):
+            await self.execute_search(chat_id)
+            return
+
+        if clean_text in ("/boost", "🚀 Boost пошук", "boost"):
+            await self.execute_search(chat_id, is_boost=True)
+            return
+
+        if clean_text in ("/stats", "/market", "📊 Статистика ринку", "статистика"):
+            await self.handle_market_stats(chat_id)
+            return
+
+        if clean_text in ("/reset", "🔄 Скинути фільтри", "скинути фільтри"):
+            await self.handle_reset(chat_id)
             return
 
         state = self.user_states.get(chat_id)
@@ -418,6 +547,7 @@ class BotHandler:
             chat_id,
             "Не вдалося розпізнати значення.\n"
             "• Щоб вказати ціну: наприклад <code>3500-5000</code> або <code>до 5000</code>.\n"
-            "• Щоб вказати пробіг: наприклад <code>250 тис</code> або <code>до 280000</code>.\n"
-            "Або надішліть /settings для відкриття меню налаштувань.",
+            "• Щоб вказати пробіг: наприклад <code>250 тис</code> або <code>до 280000</code>.\n\n"
+            "Скористайтеся кнопками меню внизу або надішліть /settings.",
+            reply_markup=build_main_reply_keyboard(),
         )

@@ -9,18 +9,27 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from src.bot.keyboards import (
     ALL_ENGINES,
+    build_main_reply_keyboard,
     build_settings_keyboard,
     format_filter_summary,
 )
 from src.database.models import Base, ListingModel, UserFilterModel
 from src.database.repository import (
     find_matching_listings,
+    get_market_overview,
     get_or_create_user_filter,
     reset_user_filter,
     update_user_filter,
 )
 from src.filtering.user_filter import matches_user_filter
 from src.models.listing import Listing
+from src.notifier.templates import (
+    format_listing_caption,
+    format_market_badge,
+    format_market_overview,
+    format_price,
+    format_price_drop_badge,
+)
 
 
 @pytest.fixture
@@ -257,3 +266,172 @@ async def test_repository_user_filters_crud():
         assert len(uf_reset.engines) == 3
 
     await engine.dispose()
+
+
+def test_build_main_reply_keyboard():
+    kb = build_main_reply_keyboard()
+    assert kb["resize_keyboard"] is True
+    assert kb["is_persistent"] is True
+    keyboard_rows = kb["keyboard"]
+    all_texts = [btn["text"] for row in keyboard_rows for btn in row]
+    assert "🔍 Знайти авто зараз" in all_texts
+    assert "⚙️ Налаштування фільтрів" in all_texts
+    assert "📊 Статистика ринку" in all_texts
+    assert "🔄 Скинути фільтри" in all_texts
+    assert "🚀 Boost пошук" in all_texts
+    assert "ℹ️ Допомога" in all_texts
+
+
+def test_format_price_decimal_and_numeric_compatibility():
+    # Decimal USD
+    res_usd = format_price(Decimal("4500.00"), "USD")
+    assert "$4 500 (~186 750 грн)" in res_usd
+
+    # Decimal UAH
+    res_uah = format_price(Decimal("200000"), "UAH")
+    assert "200 000 грн" in res_uah
+
+    # None and invalid handling
+    assert format_price(None, "USD") == "Договірна"
+    assert format_price("invalid", "USD") == "Договірна"
+
+    # Price drop badge with Decimal
+    drop_badge = format_price_drop_badge(Decimal("5000"), Decimal("4500"), Decimal("-500"))
+    assert "ЦІНУ ЗНИЖЕНО" in drop_badge
+    assert "-$500" in drop_badge
+
+    # Market badge with Decimal
+    market_badge = format_market_badge(Decimal("3000"), Decimal("4000"))
+    assert market_badge is not None
+    assert "НИЗ РИНКУ" in market_badge
+
+
+@pytest.mark.asyncio
+async def test_get_market_overview_and_formatting():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_maker() as session:
+        # Add sample listings
+        from src.database.models import SourceModel
+        source = SourceModel(
+            id="auto_ria",
+            name="AUTO.RIA",
+            base_url="https://auto.ria.com",
+            source_type="html",
+        )
+        session.add(source)
+        await session.flush()
+
+        listing1 = ListingModel(
+            source_id="auto_ria",
+            source_listing_id="ria_1",
+            url="https://auto.ria.com/1",
+            canonical_url="https://auto.ria.com/1",
+            title="Audi A6 2000",
+            brand="Audi",
+            model="A6",
+            generation="C5",
+            year=2000,
+            price=Decimal("4000.00"),
+            price_usd=Decimal("4000.00"),
+            currency="USD",
+            content_fingerprint="fp1",
+            fuzzy_fingerprint="ffp1",
+            images=["https://img.test/1.jpg"],
+        )
+        listing2 = ListingModel(
+            source_id="auto_ria",
+            source_listing_id="ria_2",
+            url="https://auto.ria.com/2",
+            canonical_url="https://auto.ria.com/2",
+            title="Audi A4 2006",
+            brand="Audi",
+            model="A4",
+            generation="B7",
+            year=2006,
+            price=Decimal("6000.00"),
+            price_usd=Decimal("6000.00"),
+            currency="USD",
+            content_fingerprint="fp2",
+            fuzzy_fingerprint="ffp2",
+            images=[],
+        )
+        session.add_all([listing1, listing2])
+        await session.flush()
+
+        # Query stats
+        stats = await get_market_overview(session)
+        assert stats["total"] == 2
+        assert stats["avg_price"] == 5000.0
+        assert stats["min_price"] == 4000.0
+        assert stats["max_price"] == 6000.0
+
+        # Check caption format with Decimal on ListingModel
+        caption = format_listing_caption(listing1)
+        assert "Audi A6 2000" in caption
+        assert "$4 000" in caption
+
+        # Format stats message
+        msg = format_market_overview(stats)
+        assert "Аналітика та статистика ринку Audi" in msg
+        assert "2 шт." in msg
+        assert "$5 000" in msg
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_bot_handler_menu_and_boost_dispatch():
+    from unittest.mock import AsyncMock, patch
+    from src.bot.handlers import BotHandler
+    import httpx
+
+    client = AsyncMock(spec=httpx.AsyncClient)
+    handler = BotHandler("fake_token", client)
+    handler.send_message = AsyncMock(return_value={"message_id": 1})
+    handler.send_photo = AsyncMock(return_value=True)
+
+    # Test handle_help
+    await handler.handle_help("123")
+    handler.send_message.assert_called()
+    call_args = handler.send_message.call_args[0]
+    assert "Як користуватися ботом" in call_args[1]
+
+    # Test menu texts in handle_text_message
+    with patch.object(handler, "execute_search", new_callable=AsyncMock) as mock_search, \
+         patch.object(handler, "handle_settings", new_callable=AsyncMock) as mock_settings, \
+         patch.object(handler, "handle_market_stats", new_callable=AsyncMock) as mock_stats, \
+         patch.object(handler, "handle_reset", new_callable=AsyncMock) as mock_reset, \
+         patch.object(handler, "handle_help", new_callable=AsyncMock) as mock_help:
+
+        # 1. Search button
+        await handler.handle_text_message("123", "🔍 Знайти авто зараз")
+        mock_search.assert_called_once_with("123")
+
+        # 2. Boost command and button
+        mock_search.reset_mock()
+        await handler.handle_text_message("123", "/boost")
+        mock_search.assert_called_once_with("123", is_boost=True)
+
+        mock_search.reset_mock()
+        await handler.handle_text_message("123", "🚀 Boost пошук")
+        mock_search.assert_called_once_with("123", is_boost=True)
+
+        # 3. Settings button
+        await handler.handle_text_message("123", "⚙️ Налаштування фільтрів")
+        mock_settings.assert_called_once_with("123")
+
+        # 4. Market stats button
+        await handler.handle_text_message("123", "📊 Статистика ринку")
+        mock_stats.assert_called_once_with("123")
+
+        # 5. Reset button
+        await handler.handle_text_message("123", "🔄 Скинути фільтри")
+        mock_reset.assert_called_once_with("123")
+
+        # 6. Help button
+        await handler.handle_text_message("123", "ℹ️ Допомога")
+        mock_help.assert_called_once_with("123")

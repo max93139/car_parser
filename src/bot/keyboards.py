@@ -196,3 +196,27 @@ def build_settings_keyboard(uf: UserFilterModel) -> Dict[str, Any]:
             reset_buttons,
         ]
     }
+
+
+def build_main_reply_keyboard() -> Dict[str, Any]:
+    """
+    Builds the persistent bottom ReplyKeyboardMarkup for quick mobile and desktop access.
+    """
+    return {
+        "keyboard": [
+            [
+                {"text": "🔍 Знайти авто зараз"},
+                {"text": "⚙️ Налаштування фільтрів"},
+            ],
+            [
+                {"text": "📊 Статистика ринку"},
+                {"text": "🔄 Скинути фільтри"},
+            ],
+            [
+                {"text": "🚀 Boost пошук"},
+                {"text": "ℹ️ Допомога"},
+            ],
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True,
+    }

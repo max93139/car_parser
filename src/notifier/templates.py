@@ -7,6 +7,7 @@ and enforcing strict 1024 character limits for media group albums.
 
 from __future__ import annotations
 
+from decimal import Decimal
 import html
 import re
 from typing import Any, Dict, Optional, Union
@@ -35,9 +36,9 @@ def format_source_badge(source: Optional[str]) -> str:
 
 
 def format_price(
-    price: Optional[float],
+    price: Optional[Union[float, int, Decimal, str]],
     currency: Optional[str] = "USD",
-    price_usd: Optional[float] = None,
+    price_usd: Optional[Union[float, int, Decimal, str]] = None,
 ) -> str:
     """
     Formats price with dual-currency conversion (USD and UAH).
@@ -59,8 +60,13 @@ def format_price(
         curr = "UAH"
 
     # Base price calculation
-    val = price if price is not None else price_usd
-    if val is None:
+    raw_val = price if price is not None else price_usd
+    if raw_val is None:
+        return "Договірна"
+
+    try:
+        val = float(raw_val)
+    except (ValueError, TypeError):
         return "Договірна"
 
     if curr == "USD":
@@ -78,29 +84,40 @@ def format_price(
     return f"{val:,.0f} {curr}".replace(",", " ")
 
 
-def format_mileage(mileage: Optional[int]) -> str:
+def format_mileage(mileage: Optional[Union[int, float, Decimal, str]]) -> str:
     """Formats odometer reading with kilometer units."""
-    if mileage is not None and mileage >= 0:
-        return f"{mileage:,} км".replace(",", " ")
+    if mileage is not None:
+        try:
+            m = int(mileage)
+            if m >= 0:
+                return f"{m:,} км".replace(",", " ")
+        except (ValueError, TypeError):
+            pass
     return "Не вказано"
 
 
 def format_price_drop_badge(
-    old_price_usd: float,
-    new_price_usd: float,
-    diff_usd: Optional[float] = None,
+    old_price_usd: Union[float, int, Decimal, str],
+    new_price_usd: Union[float, int, Decimal, str],
+    diff_usd: Optional[Union[float, int, Decimal, str]] = None,
 ) -> str:
     """
     Generates a high-visibility price drop banner.
     Highlights original price, new price, dollar savings, and discount percentage.
     """
-    diff = diff_usd if diff_usd is not None else (new_price_usd - old_price_usd)
-    abs_diff = abs(diff)
-    discount_pct = (abs_diff / old_price_usd * 100) if old_price_usd > 0 else 0
+    try:
+        old_val = float(old_price_usd) if old_price_usd is not None else 0.0
+        new_val = float(new_price_usd) if new_price_usd is not None else 0.0
+        diff_val = float(diff_usd) if diff_usd is not None else (new_val - old_val)
+    except (ValueError, TypeError):
+        return ""
+
+    abs_diff = abs(diff_val)
+    discount_pct = (abs_diff / old_val * 100) if old_val > 0 else 0
 
     diff_str = f"-${abs_diff:,.0f}".replace(",", " ")
-    old_str = f"${old_price_usd:,.0f}".replace(",", " ")
-    new_str = f"${new_price_usd:,.0f}".replace(",", " ")
+    old_str = f"${old_val:,.0f}".replace(",", " ")
+    new_str = f"${new_val:,.0f}".replace(",", " ")
 
     return (
         f"📉 <b>ЦІНУ ЗНИЖЕНО!</b> ({diff_str}, -{discount_pct:.0f}%)\n"
@@ -108,12 +125,22 @@ def format_price_drop_badge(
     )
 
 
-def format_market_badge(price_usd: Optional[float], avg_price_usd: Optional[float]) -> Optional[str]:
+def format_market_badge(
+    price_usd: Optional[Union[float, int, Decimal, str]],
+    avg_price_usd: Optional[Union[float, int, Decimal, str]],
+) -> Optional[str]:
     """Generates hot deal banner if price is >= 15% below market average."""
-    if not price_usd or not avg_price_usd or avg_price_usd <= 0:
+    if price_usd is None or avg_price_usd is None:
         return None
-    diff = avg_price_usd - price_usd
-    pct = (diff / avg_price_usd) * 100
+    try:
+        p = float(price_usd)
+        avg = float(avg_price_usd)
+    except (ValueError, TypeError):
+        return None
+    if avg <= 0:
+        return None
+    diff = avg - p
+    pct = (diff / avg) * 100
     if pct >= 15:
         return f"🔥 <b>НИЗ РИНКУ!</b> (-${diff:,.0f}, на {pct:.0f}% дешевше ринку)"
     return None
@@ -173,7 +200,11 @@ def format_listing_caption(
         transmission = listing.get("transmission") or "Не вказано"
         mileage = listing.get("mileage")
         location = listing.get("location_city") or listing.get("location") or "Україна"
-        source = listing.get("source") or "Marketplace"
+        src_val = listing.get("source")
+        if isinstance(src_val, str) and src_val:
+            source = src_val
+        else:
+            source = listing.get("source_id") or "Marketplace"
         url = listing.get("url") or ""
         description = listing.get("description") or listing.get("raw_text")
         status = listing.get("status") or "PASS"
@@ -188,7 +219,11 @@ def format_listing_caption(
         transmission = listing.transmission or "Не вказано"
         mileage = listing.mileage
         location = listing.location_city or listing.location or "Україна"
-        source = listing.source or "Marketplace"
+        src_val = getattr(listing, "source", None)
+        if isinstance(src_val, str) and src_val:
+            source = src_val
+        else:
+            source = getattr(listing, "source_id", None) or "Marketplace"
         url = listing.url or ""
         description = listing.description
         status = getattr(listing, "status", "PASS")
@@ -294,3 +329,38 @@ def format_listing_caption(
             full_caption = (header + body)[:max_length]
 
     return full_caption
+
+
+def format_market_overview(stats: Dict[str, Any]) -> str:
+    """
+    Renders human-friendly analytics summary of listings in database.
+    """
+    total = stats.get("total", 0)
+    avg_p = stats.get("avg_price")
+    min_p = stats.get("min_price")
+    max_p = stats.get("max_price")
+    models = stats.get("models", [])
+    sources = stats.get("sources", [])
+
+    lines = [
+        "📊 <b>Аналітика та статистика ринку Audi</b>\n",
+        f"🚗 <b>Всього авто в базі:</b> {total:,} шт.",
+    ]
+    if avg_p:
+        lines.append(f"💰 <b>Середня ціна:</b> ${avg_p:,.0f}".replace(",", " "))
+    if min_p and max_p:
+        lines.append(f"💵 <b>Діапазон цін:</b> ${min_p:,.0f} – ${max_p:,.0f}".replace(",", " "))
+
+    if models:
+        lines.append("\n🚘 <b>Розподіл за моделями:</b>")
+        for name, cnt in models:
+            lines.append(f"• {name}: <b>{cnt}</b> авто")
+
+    if sources:
+        lines.append("\n🌐 <b>Джерела моніторингу:</b>")
+        for src, cnt in sources:
+            src_name = format_source_badge(src)
+            lines.append(f"• {src_name}: <b>{cnt}</b> оголошень")
+
+    lines.append("\n🔄 <i>Оновлення бази відбувається щохвилини в реальному часі.</i>")
+    return "\n".join(lines)
