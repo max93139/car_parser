@@ -494,3 +494,152 @@ async def test_bot_handler_send_fallback_and_card_markup():
     assert "&lt;script&gt;" in overview
     assert "<untrusted_source>" not in overview
     assert "&lt;Untrusted Source&gt;" in overview
+
+
+@pytest.mark.asyncio
+async def test_find_matching_listings_with_uah_price_and_status_filtering():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_maker() as session:
+        from src.database.models import SourceModel
+        source = SourceModel(
+            id="auto_ria",
+            name="AUTO.RIA",
+            base_url="https://auto.ria.com",
+            source_type="html",
+        )
+        session.add(source)
+        await session.flush()
+
+        # Listing 1: Price in UAH (160,000 UAH), price_usd = 4000
+        listing_uah = ListingModel(
+            source_id="auto_ria",
+            source_listing_id="ria_uah",
+            url="https://auto.ria.com/uah",
+            canonical_url="https://auto.ria.com/uah",
+            title="Audi A6 C5 1.8T 2001",
+            brand="Audi",
+            model="A6",
+            generation="C5",
+            year=2001,
+            price=Decimal("160000.00"),
+            price_usd=Decimal("4000.00"),
+            currency="UAH",
+            engine="1.8T",
+            engine_code="1.8T",
+            transmission="manual",
+            content_fingerprint="fpuah",
+            fuzzy_fingerprint="ffpuah",
+            status="NEW",
+            images=["https://img.test/car.jpg"],
+        )
+
+        # Listing 2: Rejected listing (e.g. accident or dismantler)
+        listing_rejected = ListingModel(
+            source_id="auto_ria",
+            source_listing_id="ria_rej",
+            url="https://auto.ria.com/rej",
+            canonical_url="https://auto.ria.com/rej",
+            title="Audi A6 C5 1.8T 2001",
+            brand="Audi",
+            model="A6",
+            generation="C5",
+            year=2001,
+            price=Decimal("3500.00"),
+            price_usd=Decimal("3500.00"),
+            currency="USD",
+            engine="1.8T",
+            engine_code="1.8T",
+            transmission="manual",
+            content_fingerprint="fprej",
+            fuzzy_fingerprint="ffprej",
+            status="REJECT",
+            images=[],
+        )
+
+        session.add_all([listing_uah, listing_rejected])
+        await session.flush()
+
+        # User filter with USD max_price = 5000 (160,000 UAH would fail if comparing raw price)
+        uf = UserFilterModel(
+            chat_id="user_test",
+            selected_models=["A6 C5"],
+            engines=["1.8T"],
+            min_price=2000,
+            max_price=5000,
+            min_year=1997,
+            max_year=2005,
+            transmission="any",
+            exclude_damaged=True,
+        )
+
+        matches = await find_matching_listings(session, uf, limit=10)
+        assert len(matches) == 1
+        assert matches[0].source_listing_id == "ria_uah"
+        assert matches[0].status != "REJECT"
+
+        # Also verify matches_user_filter handles listing_uah correctly
+        assert matches_user_filter(listing_uah, uf) is True
+
+
+@pytest.mark.asyncio
+async def test_execute_search_boost_mode_dispatches_cards():
+    from unittest.mock import AsyncMock, patch
+    from src.bot.handlers import BotHandler
+    import httpx
+
+    client = AsyncMock(spec=httpx.AsyncClient)
+    handler = BotHandler("fake_token", client)
+    handler.send_message = AsyncMock(return_value={"message_id": 10})
+    handler.send_photo = AsyncMock(return_value=True)
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_maker() as session:
+        from src.database.models import SourceModel
+        source = SourceModel(id="auto_ria", name="AUTO.RIA", base_url="https://auto.ria.com", source_type="html")
+        session.add(source)
+        await session.flush()
+
+        listing = ListingModel(
+            source_id="auto_ria",
+            source_listing_id="ria_boost",
+            url="https://auto.ria.com/boost",
+            canonical_url="https://auto.ria.com/boost",
+            title="Audi A6 C5 1.8T 2000",
+            brand="Audi",
+            model="A6",
+            generation="C5",
+            year=2000,
+            price=Decimal("4200.00"),
+            price_usd=Decimal("4200.00"),
+            currency="USD",
+            engine="1.8T",
+            engine_code="1.8T",
+            transmission="manual",
+            content_fingerprint="fpboost",
+            fuzzy_fingerprint="ffpboost",
+            status="NEW",
+            images=["https://img.test/boost.jpg"],
+        )
+        session.add(listing)
+        await session.commit()
+
+    with patch("src.bot.handlers.get_session_factory", return_value=session_maker):
+        await handler.execute_search("12345", is_boost=True)
+
+    # Verifications:
+    # 1. Boost activation announcement was sent
+    assert any("Режим BOOST активовано" in call[0][1] for call in handler.send_message.call_args_list)
+    # 2. Boost results header was sent
+    assert any("[BOOST] Знайдено" in call[0][1] for call in handler.send_message.call_args_list)
+    # 3. Photo card was dispatched
+    assert handler.send_photo.call_count == 1
+    assert handler.send_photo.call_args[0][1] == "https://img.test/boost.jpg"
+

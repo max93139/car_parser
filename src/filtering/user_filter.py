@@ -72,7 +72,9 @@ def matches_user_filter(
             return False
 
     # 1. Price check
-    price = getattr(listing, "price", None)
+    price = getattr(listing, "price_usd", None)
+    if price is None:
+        price = getattr(listing, "price", None)
     if price is not None:
         try:
             price_val = float(price)

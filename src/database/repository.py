@@ -90,7 +90,7 @@ async def find_matching_listings(
     """
     Finds the most recent listings matching user's custom filter criteria.
     """
-    from sqlalchemy import or_, and_
+    from sqlalchemy import or_, and_, func
 
     active_models = getattr(user_filter, "selected_models", None) or DEFAULT_MODELS
     model_conditions = []
@@ -104,14 +104,16 @@ async def find_matching_listings(
 
     stmt = select(ListingModel).where(
         ListingModel.brand == "Audi",
+        ListingModel.status.not_in(["REJECT", "REJECTED"]),
         or_(*model_conditions) if model_conditions else True,
     )
 
-    # 1. Price filters
+    # 1. Price filters (normalize to USD or fallback)
+    effective_price = func.coalesce(ListingModel.price_usd, ListingModel.price)
     if user_filter.min_price is not None:
-        stmt = stmt.where(ListingModel.price >= user_filter.min_price)
+        stmt = stmt.where(effective_price >= user_filter.min_price)
     if user_filter.max_price is not None:
-        stmt = stmt.where(ListingModel.price <= user_filter.max_price)
+        stmt = stmt.where(effective_price <= user_filter.max_price)
 
     # 2. Year filters
     if user_filter.min_year is not None:

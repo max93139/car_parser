@@ -26,6 +26,7 @@ from src.database.repository import (
     update_user_filter,
 )
 from src.notifier.templates import format_listing_caption, format_market_overview
+from src.filtering.user_filter import matches_user_filter
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,9 @@ class BotHandler:
         async with factory() as session:
             async with session.begin():
                 uf = await get_or_create_user_filter(session, chat_id)
-                listings = await find_matching_listings(session, uf, limit=limit)
+                raw_listings = await find_matching_listings(session, uf, limit=limit * 2)
+                matched_listings = [item for item in raw_listings if matches_user_filter(item, uf)]
+                listings = (matched_listings or raw_listings)[:limit]
                 if not listings:
                     await self.send_message(
                         chat_id,
