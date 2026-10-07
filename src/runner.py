@@ -145,6 +145,7 @@ class PipelineRunner:
                     request_delay=p_cfg.auto_ria.request_delay,
                     timeout=p_cfg.auto_ria.timeout,
                     max_pages=p_cfg.auto_ria.max_pages,
+                    target_models=[("A6", "49"), ("A4", "39")],
                 )
             )
 

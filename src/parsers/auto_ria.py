@@ -27,6 +27,7 @@ class AutoRiaParser(BaseParser):
         max_pages: int = 1,
         request_delay: float = 1.5,
         timeout: float = 15.0,
+        target_models: Optional[List[tuple[str, str]]] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -37,6 +38,7 @@ class AutoRiaParser(BaseParser):
             **kwargs,
         )
         self.max_pages = max(1, max_pages)
+        self.target_models = target_models or [("A6", "49")]
 
     async def fetch_new_listings(self) -> AsyncGenerator[RawListingPayload, None]:
         """
@@ -44,17 +46,17 @@ class AutoRiaParser(BaseParser):
         """
         self.stats.start()
 
-        for page in range(1, self.max_pages + 1):
-            params: Dict[str, Any] = {
-                "categories.main.id": "1",  # Passenger cars
-                "brand.id[0]": "6",         # Audi
-                "model.id[0]": "49",        # A6
-                "model.id[1]": "39",        # A4
-                "year[0].gte": "1994",
-                "year[0].lte": "2015",
-                "order_by": "2",            # Newest first
-                "page": str(page),
-            }
+        for model_label, model_id in self.target_models:
+            for page in range(1, self.max_pages + 1):
+                params: Dict[str, Any] = {
+                    "categories.main.id": "1",  # Passenger cars
+                    "brand.id[0]": "6",         # Audi
+                    "model.id[0]": model_id,
+                    "year[0].gte": "1994",
+                    "year[0].lte": "2015",
+                    "order_by": "2",            # Newest first
+                    "page": str(page),
+                }
 
             try:
                 html = await self.fetch_html_with_retry(self.base_url, params=params)
