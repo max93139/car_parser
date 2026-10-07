@@ -48,7 +48,7 @@ class BotHandler:
         reply_markup: Optional[Dict[str, Any]] = None,
         parse_mode: str = "HTML",
     ) -> Optional[Dict[str, Any]]:
-        """Sends a text message via Telegram Bot API."""
+        """Sends a text message via Telegram Bot API with automatic plain-text fallback."""
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
@@ -61,6 +61,17 @@ class BotHandler:
         resp = await self.client.post(f"{self.api_url}/sendMessage", json=payload)
         if resp.status_code == 200:
             return resp.json().get("result")
+
+        # Fallback: if HTML parsing failed, retry as plain text without tags
+        if resp.status_code == 400 and parse_mode:
+            import re
+            plain_text = re.sub(r"<[^>]+>", "", text)
+            payload["text"] = plain_text
+            payload.pop("parse_mode", None)
+            retry_resp = await self.client.post(f"{self.api_url}/sendMessage", json=payload)
+            if retry_resp.status_code == 200:
+                return retry_resp.json().get("result")
+
         logger.warning("[bot] sendMessage failed: %s %s", resp.status_code, resp.text)
         return None
 
@@ -106,19 +117,35 @@ class BotHandler:
         chat_id: str,
         photo_url: str,
         caption: str,
+        reply_markup: Optional[Dict[str, Any]] = None,
         parse_mode: str = "HTML",
     ) -> bool:
-        """Sends a single photo with caption."""
+        """Sends a single photo with caption, optional inline markup, and automatic plain-text fallback."""
         try:
+            safe_caption = caption[:1024] if len(caption) > 1024 else caption
             payload: Dict[str, Any] = {
                 "chat_id": chat_id,
                 "photo": photo_url,
-                "caption": caption,
+                "caption": safe_caption,
                 "parse_mode": parse_mode,
             }
+            if reply_markup:
+                payload["reply_markup"] = reply_markup
+
             resp = await self.client.post(f"{self.api_url}/sendPhoto", json=payload)
             if resp.status_code == 200:
                 return True
+
+            # If HTML parsing failed on Telegram side, retry as plain text
+            if resp.status_code == 400 and parse_mode:
+                import re
+                plain_caption = re.sub(r"<[^>]+>", "", caption)[:1024]
+                payload["caption"] = plain_caption
+                payload.pop("parse_mode", None)
+                retry_resp = await self.client.post(f"{self.api_url}/sendPhoto", json=payload)
+                if retry_resp.status_code == 200:
+                    return True
+
             logger.warning("[bot] sendPhoto failed: %s %s (url: %s)", resp.status_code, resp.text, photo_url)
             return False
         except Exception as exc:
@@ -203,10 +230,11 @@ class BotHandler:
 
     async def execute_search(self, chat_id: str, is_boost: bool = False) -> None:
         """Executes search for matching listings according to user filters."""
+        limit = 10 if is_boost else 5
         if is_boost:
             await self.send_message(
                 chat_id,
-                "🚀 <b>Режим BOOST активовано!</b>\nШукаю найактуальніші пропозиції за вашими критеріями...",
+                "🚀 <b>Режим BOOST активовано!</b>\nШукаю розширений список найактуальніших пропозицій за вашими критеріями...",
                 reply_markup=build_main_reply_keyboard(),
             )
 
@@ -214,7 +242,7 @@ class BotHandler:
         async with factory() as session:
             async with session.begin():
                 uf = await get_or_create_user_filter(session, chat_id)
-                listings = await find_matching_listings(session, uf, limit=5)
+                listings = await find_matching_listings(session, uf, limit=limit)
                 if not listings:
                     await self.send_message(
                         chat_id,
@@ -225,9 +253,14 @@ class BotHandler:
                     )
                     return
 
+                header_text = (
+                    f"🚀 <b>[BOOST] Знайдено {len(listings)} найактуальніших пропозицій за вашими фільтрами:</b>"
+                    if is_boost
+                    else f"🔍 <b>Знайдено {len(listings)} останніх пропозицій за вашими фільтрами:</b>"
+                )
                 await self.send_message(
                     chat_id,
-                    f"🔍 <b>Знайдено {len(listings)} останніх пропозицій за вашими фільтрами:</b>",
+                    header_text,
                     reply_markup=build_main_reply_keyboard(),
                 )
                 for item in listings:
@@ -248,9 +281,23 @@ class BotHandler:
                             None,
                         )
 
+                        item_url = getattr(item, "url", None)
+                        card_markup = None
+                        if item_url and isinstance(item_url, str) and item_url.startswith("http"):
+                            card_markup = {
+                                "inline_keyboard": [
+                                    [{"text": "🚗 Відкрити оголошення", "url": item_url}]
+                                ]
+                            }
+
                         sent = False
                         if first_photo:
-                            sent = await self.send_photo(chat_id, first_photo, caption)
+                            sent = await self.send_photo(
+                                chat_id,
+                                first_photo,
+                                caption,
+                                reply_markup=card_markup,
+                            )
                             if not sent:
                                 logger.warning(
                                     "[bot] send_photo failed for listing %s, falling back to sendMessage",
@@ -260,7 +307,7 @@ class BotHandler:
                             await self.send_message(
                                 chat_id,
                                 caption,
-                                reply_markup=build_main_reply_keyboard(),
+                                reply_markup=card_markup,
                             )
                     except Exception as exc:
                         logger.exception(
@@ -441,7 +488,7 @@ class BotHandler:
             await self.execute_search(chat_id)
             return
 
-        if clean_text in ("/boost", "🚀 Boost пошук", "boost"):
+        if clean_text in ("/boost", "🚀 Boost пошук", "boost", "🚀 /boost", "/boost пошук", "boost пошук"):
             await self.execute_search(chat_id, is_boost=True)
             return
 

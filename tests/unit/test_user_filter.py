@@ -435,3 +435,62 @@ async def test_bot_handler_menu_and_boost_dispatch():
         # 6. Help button
         await handler.handle_text_message("123", "ℹ️ Допомога")
         mock_help.assert_called_once_with("123")
+
+
+@pytest.mark.asyncio
+async def test_bot_handler_send_fallback_and_card_markup():
+    from unittest.mock import AsyncMock, MagicMock
+    from src.bot.handlers import BotHandler
+    import httpx
+
+    # Test 1: send_message retries as plain text when HTML parsing fails (HTTP 400)
+    client = AsyncMock(spec=httpx.AsyncClient)
+    resp_fail = MagicMock(spec=httpx.Response)
+    resp_fail.status_code = 400
+    resp_fail.text = '{"ok":false,"description":"Bad Request: can\'t parse entities"}'
+
+    resp_ok = MagicMock(spec=httpx.Response)
+    resp_ok.status_code = 200
+    resp_ok.json.return_value = {"ok": True, "result": {"message_id": 999}}
+
+    client.post.side_effect = [resp_fail, resp_ok]
+
+    handler = BotHandler("fake_token", client)
+    res = await handler.send_message("123", "<b>Hello <i>world</i></b>")
+    assert res == {"message_id": 999}
+    assert client.post.call_count == 2
+    # Verify second call had parse_mode removed and HTML tags stripped
+    second_payload = client.post.call_args_list[1][1]["json"]
+    assert "parse_mode" not in second_payload
+    assert second_payload["text"] == "Hello world"
+
+    # Test 2: send_photo retries as plain text when caption parse fails (HTTP 400)
+    client.reset_mock()
+    client.post.side_effect = [resp_fail, resp_ok]
+    photo_res = await handler.send_photo("123", "https://img.test/a.jpg", "<b>Car</b> caption")
+    assert photo_res is True
+    assert client.post.call_count == 2
+    photo_retry_payload = client.post.call_args_list[1][1]["json"]
+    assert "parse_mode" not in photo_retry_payload
+    assert photo_retry_payload["caption"] == "Car caption"
+
+    # Test 3: format_listing_caption handles empty/invalid url safely
+    no_url_listing = {
+        "title": "Audi A6",
+        "price": Decimal("3000"),
+        "url": "",
+    }
+    cap_no_url = format_listing_caption(no_url_listing)
+    assert "Посилання відсутнє" in cap_no_url
+
+    # Test 4: format_market_overview escapes dangerous tags in model and source names
+    dirty_stats = {
+        "total": 5,
+        "models": [("A6 <script>", 3)],
+        "sources": [("<untrusted_source>", 2)],
+    }
+    overview = format_market_overview(dirty_stats)
+    assert "<script>" not in overview
+    assert "&lt;script&gt;" in overview
+    assert "<untrusted_source>" not in overview
+    assert "&lt;Untrusted Source&gt;" in overview

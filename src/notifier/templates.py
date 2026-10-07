@@ -294,8 +294,11 @@ def format_listing_caption(
         f"🛣️ <b>Пробіг:</b> {formatted_mileage}",
         f"📍 <b>Місто:</b> {safe_location}",
         f"🏷️ <b>Джерело:</b> {safe_source}",
-        f"🔗 <a href=\"{safe_url}\">Посилання на оголошення</a>",
     ])
+    if safe_url and safe_url.startswith("http"):
+        body_lines.append(f'🔗 <a href="{safe_url}">Посилання на оголошення</a>')
+    else:
+        body_lines.append("🔗 <i>Посилання відсутнє</i>")
     body = "\n".join(body_lines)
 
     # 5. Build Description Block with Strict Length Budget
@@ -309,24 +312,30 @@ def format_listing_caption(
         if max_desc_len > 20:
             clean_desc = description.strip()
             if len(clean_desc) > max_desc_len:
-                # Slice raw text first, then escape to prevent cutting HTML tags
                 clean_desc = clean_desc[:max_desc_len].rstrip() + "..."
-            desc_block = f"{desc_prefix}{html.escape(clean_desc)}"
+            escaped_desc = html.escape(clean_desc)
+            while len(escaped_desc) > (remaining_budget - len(desc_prefix)) and len(clean_desc) > 10:
+                clean_desc = clean_desc[:-10].rstrip() + "..."
+                escaped_desc = html.escape(clean_desc)
+            if len(escaped_desc) <= (remaining_budget - len(desc_prefix)):
+                desc_block = f"{desc_prefix}{escaped_desc}"
 
     full_caption = fixed_content + desc_block
 
-    # 6. Safety check: ensure caption strictly fits max_length
+    # 6. Safety check: ensure caption strictly fits max_length without breaking HTML tags
     if len(full_caption) > max_length:
         if desc_block:
-            # Drop description block completely if it causes an overflow
             full_caption = fixed_content
         if len(full_caption) > max_length:
-            # Extreme fallback: truncate title safely
             excess = len(full_caption) - max_length + 3
             truncated_title = safe_title[:-excess] + "..." if len(safe_title) > excess else safe_title[:20]
             header_lines[0] = f"🚗 <b>{truncated_title}</b>{year_str}"
             header = "\n".join(header_lines) + "\n\n"
-            full_caption = (header + body)[:max_length]
+            full_caption = header + body
+            if len(full_caption) > max_length:
+                import re
+                plain_text = re.sub(r"<[^>]+>", "", full_caption)
+                full_caption = plain_text[:max_length]
 
     return full_caption
 
@@ -354,12 +363,13 @@ def format_market_overview(stats: Dict[str, Any]) -> str:
     if models:
         lines.append("\n🚘 <b>Розподіл за моделями:</b>")
         for name, cnt in models:
-            lines.append(f"• {name}: <b>{cnt}</b> авто")
+            safe_name = html.escape(str(name or "Невідомо"))
+            lines.append(f"• {safe_name}: <b>{cnt}</b> авто")
 
     if sources:
         lines.append("\n🌐 <b>Джерела моніторингу:</b>")
         for src, cnt in sources:
-            src_name = format_source_badge(src)
+            src_name = html.escape(format_source_badge(src))
             lines.append(f"• {src_name}: <b>{cnt}</b> оголошень")
 
     lines.append("\n🔄 <i>Оновлення бази відбувається щохвилини в реальному часі.</i>")
