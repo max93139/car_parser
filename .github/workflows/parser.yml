@@ -68,5 +68,7 @@ jobs:
           fi
           if [ -n "${{ github.event.inputs.source }}" ]; then
             CMD_ARGS="$CMD_ARGS --source ${{ github.event.inputs.source }}"
+          elif [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            CMD_ARGS="$CMD_ARGS --source auto_ria"
           fi
           python -m src.main $CMD_ARGS
