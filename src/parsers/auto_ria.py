@@ -58,38 +58,37 @@ class AutoRiaParser(BaseParser):
                     "page": str(page),
                 }
 
-            try:
-                html = await self.fetch_html_with_retry(self.base_url, params=params)
-                if not html:
-                    logger.warning("[auto_ria] No HTML content returned for page %d", page)
-                    if page == 1:
-                        self.stats.finish(status="FAILED")
-                        return
-                    continue
-
-                soup = BeautifulSoup(html, "html.parser")
-                ticket_items = soup.select("section.ticket-item, div.ticket-item, a.product-card")
-
-                if not ticket_items:
-                    logger.info("[auto_ria] No tickets found on page %d", page)
-                    break
-
-                for ticket in ticket_items:
-                    self.stats.record_fetched()
-                    try:
-                        payload = self._parse_ticket(ticket)
-                        if payload:
-                            self.stats.record_valid()
-                            yield payload
-                    except Exception as item_err:
-                        self.stats.record_error()
-                        logger.error("[auto_ria] Error parsing listing card: %s", item_err, exc_info=False)
+                try:
+                    html = await self.fetch_html_with_retry(self.base_url, params=params)
+                    if not html:
+                        logger.warning("[auto_ria] No HTML content returned for model %s page %d", model_label, page)
+                        if page == 1:
+                            break
                         continue
 
-            except Exception as page_err:
-                self.stats.record_error()
-                logger.error("[auto_ria] Error fetching page %d: %s", page, page_err, exc_info=True)
-                continue
+                    soup = BeautifulSoup(html, "html.parser")
+                    ticket_items = soup.select("section.ticket-item, div.ticket-item, a.product-card")
+
+                    if not ticket_items:
+                        logger.info("[auto_ria] No tickets found for model %s on page %d", model_label, page)
+                        break
+
+                    for ticket in ticket_items:
+                        self.stats.record_fetched()
+                        try:
+                            payload = self._parse_ticket(ticket)
+                            if payload:
+                                self.stats.record_valid()
+                                yield payload
+                        except Exception as item_err:
+                            self.stats.record_error()
+                            logger.error("[auto_ria] Error parsing listing card: %s", item_err, exc_info=False)
+                            continue
+
+                except Exception as page_err:
+                    self.stats.record_error()
+                    logger.error("[auto_ria] Error fetching page %d: %s", page, page_err, exc_info=True)
+                    continue
 
         self.stats.finish()
 

@@ -271,6 +271,37 @@ class TestAutoRiaParser:
         assert items[0].source_id == "101"
         assert items[1].source_id == "102"
 
+    @pytest.mark.asyncio
+    async def test_multi_page_pagination_fetches_all_pages(self):
+        page1_html = """
+        <section class="ticket-item" data-auto-id="101">
+            <a class="address" href="/auto_101.html">Audi A6 2001</a>
+            <span data-currency="USD">4 000 $</span>
+        </section>
+        """
+        page2_html = """
+        <section class="ticket-item" data-auto-id="102">
+            <a class="address" href="/auto_102.html">Audi A6 2002</a>
+            <span data-currency="USD">4 500 $</span>
+        </section>
+        """
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get = AsyncMock(side_effect=[
+            httpx.Response(200, text=page1_html),
+            httpx.Response(200, text=page2_html),
+            httpx.Response(200, text="<html><body></body></html>"),
+        ])
+
+        parser = AutoRiaParser(client=mock_client, max_pages=2, request_delay=0)
+        items = [item async for item in parser.fetch_new_listings()]
+        assert len(items) == 2
+        assert items[0].source_id == "101"
+        assert items[1].source_id == "102"
+        assert mock_client.get.call_count >= 2
+        calls = mock_client.get.call_args_list
+        assert calls[0][1]["params"]["page"] == "1"
+        assert calls[1][1]["params"]["page"] == "2"
+
 
 # ==============================================================================
 # 3. OLX Parser Tests
