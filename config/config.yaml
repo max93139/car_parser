@@ -33,9 +33,9 @@ database:
 parsers:
   auto_ria:
     enabled: true
-    request_delay: 1.5
+    request_delay: 1.0
     timeout: 15.0
-    max_pages: 3
+    max_pages: 10
   olx:
     enabled: true
     request_delay: 2.0

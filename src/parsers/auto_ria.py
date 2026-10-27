@@ -54,7 +54,8 @@ class AutoRiaParser(BaseParser):
                     "model.id[0]": model_id,
                     "year[0].gte": "1994",
                     "year[0].lte": "2015",
-                    "order_by": "2",            # Newest first
+                    "order_by": "7",            # Date added: newest first (7 = Дата додавання)
+                    "sort[0].order": "dates.created.desc",
                     "page": str(page),
                 }
 
