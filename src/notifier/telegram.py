@@ -23,6 +23,7 @@ from src.config import get_settings
 from src.database.models import ListingModel
 from src.models.listing import Listing
 from src.notifier.templates import format_listing_caption
+from src.bot.keyboards import build_listing_card_markup
 
 logger = logging.getLogger(__name__)
 
@@ -226,29 +227,42 @@ class TelegramNotifier:
         result = await self._post_api("sendMediaGroup", payload)
         return result is not None and result.get("ok", False)
 
-    async def send_photo(self, photo: str, caption: str) -> bool:
+    async def send_photo(
+        self,
+        photo: str,
+        caption: str,
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """
-        Dispatches a single photo message with an HTML caption.
+        Dispatches a single photo message with an HTML caption and optional inline buttons.
         """
-        payload = {
+        payload: Dict[str, Any] = {
             "chat_id": self.chat_id,
             "photo": photo,
             "caption": caption,
             "parse_mode": "HTML",
         }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
         result = await self._post_api("sendPhoto", payload)
         return result is not None and result.get("ok", False)
 
-    async def send_message(self, text: str) -> bool:
+    async def send_message(
+        self,
+        text: str,
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """
-        Dispatches a text-only HTML message (supports up to 4096 characters).
+        Dispatches a text-only HTML message (supports up to 4096 characters) and optional inline buttons.
         """
-        payload = {
+        payload: Dict[str, Any] = {
             "chat_id": self.chat_id,
             "text": text,
             "parse_mode": "HTML",
             "disable_web_page_preview": False,
         }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
         result = await self._post_api("sendMessage", payload)
         return result is not None and result.get("ok", False)
 
@@ -257,6 +271,7 @@ class TelegramNotifier:
         listing: Union[Listing, Dict[str, Any], ListingModel],
         price_drop_info: Optional[Dict[str, Any]] = None,
         session: Optional[AsyncSession] = None,
+        reply_markup: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Main alert dispatcher:
@@ -264,6 +279,7 @@ class TelegramNotifier:
         - Falls back to sendPhoto if listing has 1 photo (or if sendMediaGroup fails).
         - Falls back to sendMessage if listing has 0 photos (or if photo delivery fails).
         - Automatically updates DB state if session is provided.
+        - Attaches inline [ 🧠 Аналіз ШІ ] button if listing ID is present.
         """
         # 1. Resolve photo URLs
         raw_images = getattr(listing, "images", None)
@@ -277,29 +293,44 @@ class TelegramNotifier:
         # 2. Render caption with 1024 char hard limit
         caption = format_listing_caption(listing, price_drop_info=price_drop_info, max_length=1024)
 
+        # Build inline card markup with [ 🧠 Аналіз ШІ ] if listing ID is present
+        listing_id = getattr(listing, "id", None)
+        if listing_id is None and isinstance(listing, dict):
+            listing_id = listing.get("id")
+
+        listing_url = getattr(listing, "url", None)
+        if listing_url is None and isinstance(listing, dict):
+            listing_url = listing.get("url")
+
+        card_markup = reply_markup
+        if card_markup is None and listing_id is not None:
+            card_markup = build_listing_card_markup(listing_id, listing_url)
+
         success = False
 
         # 3. Strategy execution with fallback hierarchy
         if len(photos) >= 2:
             success = await self.send_media_group(photos, caption)
-            if not success:
+            if success and card_markup:
+                await self.send_message("🧠 <b>Аналіз та деталі оголошення:</b>", reply_markup=card_markup)
+            elif not success:
                 logger.warning("[TelegramNotifier] sendMediaGroup failed. Falling back to sendPhoto.")
-                success = await self.send_photo(photos[0], caption)
+                success = await self.send_photo(photos[0], caption, reply_markup=card_markup)
                 if not success:
                     logger.warning("[TelegramNotifier] sendPhoto fallback failed. Falling back to sendMessage.")
                     text_caption = format_listing_caption(listing, price_drop_info=price_drop_info, max_length=4000)
-                    success = await self.send_message(text_caption)
+                    success = await self.send_message(text_caption, reply_markup=card_markup)
 
         elif len(photos) == 1:
-            success = await self.send_photo(photos[0], caption)
+            success = await self.send_photo(photos[0], caption, reply_markup=card_markup)
             if not success:
                 logger.warning("[TelegramNotifier] sendPhoto failed. Falling back to sendMessage.")
                 text_caption = format_listing_caption(listing, price_drop_info=price_drop_info, max_length=4000)
-                success = await self.send_message(text_caption)
+                success = await self.send_message(text_caption, reply_markup=card_markup)
 
         else:
             text_caption = format_listing_caption(listing, price_drop_info=price_drop_info, max_length=4000)
-            success = await self.send_message(text_caption)
+            success = await self.send_message(text_caption, reply_markup=card_markup)
 
         # 4. State synchronization if successful
         if success:

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.bot.keyboards import (
     ALL_ENGINES,
+    build_listing_card_markup,
     build_main_reply_keyboard,
     build_settings_keyboard,
     format_filter_summary,
@@ -20,11 +21,13 @@ from src.database.connection import get_session_factory
 from src.database.models import UserFilterModel
 from src.database.repository import (
     find_matching_listings,
+    get_listing_by_id,
     get_market_overview,
     get_or_create_user_filter,
     reset_user_filter,
     update_user_filter,
 )
+from src.services.ai_analyzer import GeminiCarAnalyzer
 from src.notifier.templates import format_listing_caption, format_market_overview
 from src.filtering.user_filter import matches_user_filter
 
@@ -257,7 +260,8 @@ class BotHandler:
                     return
 
                 header_text = (
-                    f"🚀 <b>[BOOST] Знайдено {len(listings)} найактуальніших пропозицій за вашими фільтрами:</b>"
+                    f"🚀 <b>[BOOST] Знайдено {len(listings)} найактуальніших пропозицій за вашими фільтрами:</b>\n"
+                    f"💡 <i>Під кожним авто доступна кнопка <b>[ 🧠 Аналіз ШІ ]</b> для оцінки моделлю Gemini 2.0 Flash!</i>"
                     if is_boost
                     else f"🔍 <b>Знайдено {len(listings)} останніх пропозицій за вашими фільтрами:</b>"
                 )
@@ -285,13 +289,8 @@ class BotHandler:
                         )
 
                         item_url = getattr(item, "url", None)
-                        card_markup = None
-                        if item_url and isinstance(item_url, str) and item_url.startswith("http"):
-                            card_markup = {
-                                "inline_keyboard": [
-                                    [{"text": "🚗 Відкрити оголошення", "url": item_url}]
-                                ]
-                            }
+                        item_id = getattr(item, "id", None)
+                        card_markup = build_listing_card_markup(item_id, item_url)
 
                         sent = False
                         if first_photo:
@@ -327,6 +326,32 @@ class BotHandler:
         data: str,
     ) -> None:
         """Handles inline keyboard button presses."""
+        # 0. AI Car Analysis Callback (Gemini 2.0 Flash)
+        if data.startswith("ai_analyze:"):
+            raw_id = data.split(":", 1)[1]
+            await self.answer_callback(callback_id, "🧠 Запускаю аналіз ШІ...")
+            try:
+                listing_id = int(raw_id)
+            except (ValueError, TypeError):
+                await self.send_message(chat_id, "⚠️ Некоректний ідентифікатор оголошення.")
+                return
+
+            factory = get_session_factory()
+            async with factory() as session:
+                listing = await get_listing_by_id(session, listing_id)
+
+            if not listing:
+                await self.send_message(
+                    chat_id,
+                    "⚠️ <b>Оголошення не знайдено в базі даних</b> або воно було видалене.",
+                )
+                return
+
+            analyzer = GeminiCarAnalyzer(client=self.client)
+            analysis_text = await analyzer.analyze_listing(listing)
+            await self.send_message(chat_id, analysis_text)
+            return
+
         factory = get_session_factory()
         async with factory() as session:
             async with session.begin():

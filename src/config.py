@@ -104,6 +104,7 @@ class Settings(BaseSettings):
     TELEGRAM_API_HASH: Optional[str] = None
     TELEGRAM_SESSION_STRING: Optional[str] = None
     INSTAGRAM_SESSION_COOKIE: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
 
     # Sub-sections
     app: AppConfig = Field(default_factory=AppConfig)
@@ -143,6 +144,12 @@ class Settings(BaseSettings):
 
         if self.INSTAGRAM_SESSION_COOKIE:
             self.parsers.instagram.session_cookie = self.INSTAGRAM_SESSION_COOKIE
+
+        gemini_env = os.getenv("GEMINI_API_KEY")
+        if gemini_env:
+            self.GEMINI_API_KEY = gemini_env.strip()
+        elif self.GEMINI_API_KEY:
+            self.GEMINI_API_KEY = self.GEMINI_API_KEY.strip()
 
         return self
 

@@ -82,6 +82,15 @@ async def reset_user_filter(session: AsyncSession, chat_id: str) -> UserFilterMo
     )
 
 
+async def get_listing_by_id(session: AsyncSession, listing_id: int) -> Optional[ListingModel]:
+    """
+    Fetches a single ListingModel record by its primary key ID.
+    """
+    stmt = select(ListingModel).where(ListingModel.id == listing_id)
+    res = await session.execute(stmt)
+    return res.scalar_one_or_none()
+
+
 async def find_matching_listings(
     session: AsyncSession,
     user_filter: UserFilterModel,

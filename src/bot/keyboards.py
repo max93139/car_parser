@@ -5,7 +5,7 @@ Generates interactive Telegram Bot API inline keyboards with status badges.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from src.database.models import UserFilterModel
 
 ALL_ENGINES = ["1.8T", "2.4", "1.9 TDI"]
@@ -220,3 +220,21 @@ def build_main_reply_keyboard() -> Dict[str, Any]:
         "resize_keyboard": True,
         "is_persistent": True,
     }
+
+
+def build_listing_card_markup(
+    listing_id: Optional[Union[int, str]],
+    url: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Builds the inline keyboard for a car listing card with external link and AI analysis button.
+    """
+    buttons: List[List[Dict[str, str]]] = []
+    if url and isinstance(url, str) and url.startswith("http"):
+        buttons.append([{"text": "🚗 Відкрити оголошення", "url": url}])
+    if listing_id is not None:
+        buttons.append([{"text": "🧠 Аналіз ШІ", "callback_data": f"ai_analyze:{listing_id}"}])
+
+    if buttons:
+        return {"inline_keyboard": buttons}
+    return None

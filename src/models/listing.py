@@ -162,6 +162,7 @@ class Listing(BaseModel):
     )
 
     # Source identity
+    id: Optional[int] = Field(default=None, description="Database primary key if persisted")
     source: str = Field(..., description="Platform identifier: auto_ria, olx, rst, telegram, instagram")
     source_id: str = Field(..., min_length=1, max_length=128, description="Native source ad ID")
     url: str = Field(..., min_length=1, description="Original raw ad URL")
