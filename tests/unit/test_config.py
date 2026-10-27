@@ -69,3 +69,18 @@ def test_get_settings_singleton():
 
     s3 = get_settings(reload=True)
     assert s3 is not None
+
+
+def test_gemini_config_loading(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "AIzaSyTest12345")
+    settings = Settings.load("config/config.yaml")
+    assert settings.GEMINI_API_KEY == "AIzaSyTest12345"
+    assert settings.gemini.api_key == "AIzaSyTest12345"
+    assert settings.gemini.model == "gemini-2.0-flash"
+
+    # YAML dict with gemini section
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    custom = Settings(gemini={"api_key": "from_yaml_key", "model": "gemini-2.0-flash-lite"})
+    assert custom.GEMINI_API_KEY == "from_yaml_key"
+    assert custom.gemini.api_key == "from_yaml_key"
+    assert custom.gemini.model == "gemini-2.0-flash-lite"

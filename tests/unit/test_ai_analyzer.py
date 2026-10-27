@@ -102,6 +102,35 @@ class TestGeminiPromptAndSanitization:
         assert len(res) <= 4000
         assert "[Скорочено через ліміт Telegram]" in res
 
+    def test_build_gemini_car_prompt_robust_against_none_dict_and_strings(self):
+        edge_dict = {
+            "brand": None,
+            "model": None,
+            "generation": None,
+            "price": "договірна",
+            "price_usd": None,
+            "mileage": "250 тис",
+        }
+        prompt = build_gemini_car_prompt(edge_dict)
+        assert "Audi A6 C5" in prompt
+        assert "договірна USD" in prompt
+        assert "250 тис км" in prompt
+
+    def test_sanitize_markdown_balances_tags_when_truncated(self):
+        long_bold = "<b>" + ("Слово " * 700)
+        res = sanitize_markdown_to_telegram_html(long_bold)
+        assert len(res) <= 4000
+        assert res.endswith("...\n<i>[Скорочено через ліміт Telegram]</i>")
+        assert res.count("<b>") == res.count("</b>")
+
+    def test_sanitize_markdown_escapes_forbidden_tags_and_preserves_allowed(self):
+        text = "### <b>Заголовок</b>\n<p>Параграф</p>\n<script>alert(1)</script>\n`code`"
+        res = sanitize_markdown_to_telegram_html(text)
+        assert "<b>Заголовок</b>" in res
+        assert "&lt;p&gt;" in res
+        assert "&lt;script&gt;" in res
+        assert "<code>code</code>" in res
+
 
 class TestGeminiCarAnalyzerClient:
     """Tests for GeminiCarAnalyzer async client, error branches, and mock responses."""
@@ -311,6 +340,7 @@ class TestBotHandlerAIAnalyzeCallback:
                 assert second_call[0][0].endswith("/sendMessage")
                 assert second_call[1]["json"]["chat_id"] == "12345"
                 assert "Варто дивитися" in second_call[1]["json"]["text"]
+        await engine.dispose()
 
     @pytest.mark.asyncio
     async def test_handle_callback_query_ai_analyze_non_existent_listing(self):
@@ -341,6 +371,7 @@ class TestBotHandlerAIAnalyzeCallback:
 
             msg_call = client.post.call_args_list[1]
             assert "не знайдено в базі даних" in msg_call[1]["json"]["text"]
+        await engine.dispose()
 
 
 class TestTelegramNotifierAIButtonIntegration:
@@ -398,4 +429,97 @@ class TestTelegramNotifierAIButtonIntegration:
         assert call_json.get("reply_markup") is not None
         kb_rows = call_json["reply_markup"]["inline_keyboard"]
         assert any(btn.get("callback_data") == "ai_analyze:42" for row in kb_rows for btn in row)
+
+    @pytest.mark.asyncio
+    async def test_gemini_safety_block_handled(self, sample_listing_obj: Listing):
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [
+                {
+                    "finishReason": "SAFETY",
+                    "content": {"parts": []},
+                }
+            ]
+        }
+        mock_client.post.return_value = mock_resp
+
+        analyzer = GeminiCarAnalyzer(api_key="key", client=mock_client)
+        res = await analyzer.analyze_listing(sample_listing_obj)
+        assert "фільтром безпеки" in res
+
+    @pytest.mark.asyncio
+    async def test_gemini_custom_model_passed_in_url(self, sample_listing_obj: Listing):
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": "OK"}]}}]
+        }
+        mock_client.post.return_value = mock_resp
+
+        analyzer = GeminiCarAnalyzer(api_key="key", client=mock_client, model="gemini-2.0-flash-lite")
+        await analyzer.analyze_listing(sample_listing_obj)
+        call_url = mock_client.post.call_args[0][0]
+        assert "gemini-2.0-flash-lite:generateContent" in call_url
+
+    @pytest.mark.asyncio
+    async def test_handle_text_boost_with_id_executes_analysis(self):
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        session_maker = async_sessionmaker(engine, expire_on_commit=False)
+
+        async with session_maker() as session:
+            source = SourceModel(
+                id="auto_ria",
+                name="AUTO.RIA",
+                base_url="https://auto.ria.com",
+                source_type="auto_ria",
+            )
+            session.add(source)
+            await session.flush()
+
+            listing = ListingModel(
+                id=88,
+                source_id="auto_ria",
+                source_listing_id="aria_88",
+                url="https://auto.ria.com/88",
+                canonical_url="https://auto.ria.com/88",
+                title="Audi A6 1.8T 2003",
+                brand="Audi",
+                model="A6",
+                generation="C5",
+                year=2003,
+                price=5200,
+                content_fingerprint="fp88",
+                fuzzy_fingerprint="fuzz88",
+            )
+            session.add(listing)
+            await session.commit()
+
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp_msg = MagicMock(spec=httpx.Response)
+        resp_msg.status_code = 200
+        resp_msg.json.return_value = {"ok": True, "result": {"message_id": 999}}
+        client.post.return_value = resp_msg
+
+        handler = BotHandler("fake_token", client)
+
+        with patch("src.bot.handlers.get_session_factory", return_value=session_maker):
+            with patch.object(
+                GeminiCarAnalyzer,
+                "analyze_listing",
+                return_value="🧠 <b>ШІ-Експертиза:</b> Відмінний вибір!",
+            ) as mock_analyze:
+                await handler.handle_text_message("12345", "/boost 88")
+
+                mock_analyze.assert_called_once()
+                arg = mock_analyze.call_args[0][0]
+                assert arg.id == 88
+                assert client.post.call_count == 2
+                call2 = client.post.call_args_list[1]
+                assert "Відмінний вибір" in call2[1]["json"]["text"]
+        await engine.dispose()
 
