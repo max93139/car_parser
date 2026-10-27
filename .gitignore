@@ -43,6 +43,10 @@ env/
 .env.local
 *.session
 *.session-journal
+.session_string
+.phone_code_hash
+.2fa_pwd
+telegram_qr.png
 
 # Agent workspaces & internal telemetry
 .agents/
@@ -59,3 +63,5 @@ htmlcov/
 Thumbs.db
 .neon
 node_modules/
+*.log
+

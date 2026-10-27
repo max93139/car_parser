@@ -1,35 +1,34 @@
 app:
-  env: "production"
+  env: production
   debug: false
-  log_level: "INFO"
-  timezone: "Europe/Kyiv"
-
+  log_level: INFO
+  timezone: Europe/Kyiv
 search:
-  brand: "Audi"
-  model: "A6"
-  generation: "C5"
+  brand: Audi
+  model: A6
+  generation: C5
   min_year: 1997
   max_year: 2005
   target_engines:
-    - code: "1.8T"
-      displacement: 1.8
-      fuel: "petrol"
-      turbo: true
-    - code: "2.4"
-      displacement: 2.4
-      fuel: ["petrol", "lpg"]
-      turbo: false
-    - code: "1.9TDI"
-      displacement: 1.9
-      fuel: "diesel"
-      turbo: true
-
+  - code: 1.8T
+    displacement: 1.8
+    fuel: petrol
+    turbo: true
+  - code: '2.4'
+    displacement: 2.4
+    fuel:
+    - petrol
+    - lpg
+    turbo: false
+  - code: 1.9TDI
+    displacement: 1.9
+    fuel: diesel
+    turbo: true
 database:
-  url: "postgresql+asyncpg://postgres:postgres@localhost:5432/car_db"
+  url: postgresql+asyncpg://postgres:postgres@localhost:5432/car_db
   pool_size: 5
   max_overflow: 10
   pool_timeout: 30.0
-
 parsers:
   auto_ria:
     enabled: true
@@ -48,190 +47,194 @@ parsers:
     max_pages: 2
   telegram:
     enabled: true
-    api_id: null
-    api_hash: null
-    session_string: null
+    api_id: 36752148
+    api_hash: 0f91ef066beb9c6ba68a0bbdee283f4b
+    session_string: ""
     channels:
-      - "@autobazar_ua"
-      - "@autopoisk_ua"
-      - "@audi_club_ua"
-      - "@avtobazar_ukraine"
-      - "@autoria_tg"
-      - "@auto_bazar_ukr"
-      - "@autoria_com"
-      - "@autobazar_kiev"
-      - "@avto_bazar_kyiv"
-      - "@autobazar_lviv"
-      - "@avto_lviv"
-      - "@autobazar_dnipro"
-      - "@avto_dnepr"
-      - "@autobazar_odessa"
-      - "@avto_odessa"
-      - "@autobazar_kharkiv"
-      - "@avto_kharkiv"
-      - "@autobazar_lutsk"
-      - "@avto_lutsk"
-      - "@autobazar_rivne"
-      - "@avto_rivne"
-      - "@autobazar_ternopil"
-      - "@avto_ternopil"
-      - "@autobazar_if"
-      - "@avto_ivano_frankivsk"
-      - "@autobazar_uzhhorod"
-      - "@avto_zakarpattia"
-      - "@autobazar_chernivtsi"
-      - "@avto_chernivtsi"
-      - "@autobazar_khmelnytskyi"
-      - "@avto_khmelnitsky"
-      - "@autobazar_vinnytsia"
-      - "@avto_vinnitsa"
-      - "@autobazar_zhytomyr"
-      - "@avto_zhytomyr"
-      - "@autobazar_poltava"
-      - "@avto_poltava"
-      - "@autobazar_cherkasy"
-      - "@avto_cherkasy"
-      - "@autobazar_sumy"
-      - "@avto_sumy"
-      - "@autobazar_chernihiv"
-      - "@avto_chernigov"
-      - "@autobazar_zaporizhzhia"
-      - "@avto_zaporozhye"
-      - "@autobazar_mykolaiv"
-      - "@avto_nikolaev"
-      - "@avtobazar_kr"
-      - "@autobazar_kryvyirih"
-      - "@avto_ua_sale"
-      - "@autoploshadka_ua"
-      - "@car_bazar_ua"
-      - "@cars_ukraine"
-      - "@autorynok_ua"
-      - "@avtorynok_ukraine"
-      - "@kupit_avto_ua"
-      - "@prodazh_avto_ua"
-      - "@avto_do_5000"
-      - "@avto_do_10000"
-      - "@avto_do_3000"
-      - "@avto_do_4000"
-      - "@avto_do_6000"
-      - "@bazar_avto_ua"
-      - "@ukr_autobazar"
-      - "@auto_komissionka_ua"
-      - "@vag_bazar_ua"
-      - "@vag_ukraine"
-      - "@audi_vag_ua"
-      - "@audi_bazar_ua"
-      - "@audi_market_ua"
-      - "@audi_fans_ua"
-      - "@vag_market_ua"
-      - "@audi_ukraine_club"
-      - "@avtorynok_kiev"
-      - "@avtorynok_lviv"
-      - "@avtorynok_dnipro"
-      - "@avtorynok_odessa"
-      - "@avtorynok_kharkiv"
-      - "@avtobarakholka_ua"
-      - "@avtobarakholka_kiev"
-      - "@avtobarakholka_lviv"
-      - "@avto_barakholka_ukr"
-      - "@car_sale_ukraine"
-      - "@autobid_ua"
-      - "@auto_auction_ua"
-      - "@evroblakhy_ua"
-      - "@nerastamozhennye_ua"
-      - "@avto_z_evropy"
-      - "@avto_iz_polshi"
-      - "@avtoprigon_ua"
-      - "@prigon_avto_ua"
-      - "@autopodbor_ukraine"
-      - "@auto_expert_ua"
-      - "@autocheck_ua"
-      - "@hot_cars_ua"
-      - "@top_cars_ua"
-      - "@avto_treyd_ua"
-      - "@avto_diler_ua"
-      - "@avtosale_ukraine"
-      - "@avtoobmen_ua"
-      - "@shvydke_avto_ua"
-      - "@cars_kiev_sale"
-      - "@cars_lviv_sale"
-      - "@cars_dnipro_sale"
-      - "@cars_odessa_sale"
-      - "@cars_kharkiv_sale"
+    - '@ua_autobazar'
+    - '@avtorynok_ukraina'
+    - '@avtobazarz'
+    - '@avto_bazarok'
+    - '@Avto_Ria_Ukraine'
+    - '@LinkinAuto'
+    - '@AvtoBazar8'
+    - '@AutomartUa'
+    - '@avto_ukraina'
+    - '@avtoria_ukraina'
+    - '@audi_club_ukraine'
+    - '@autoria_com'
+    - '@autobazar'
+    - '@avto_ukraine'
+    - '@avto_bazar_kyiv'
+    - '@autobazar_lviv'
+    - '@avto_lviv'
+    - '@autobazar_dnipro'
+    - '@avto_dnepr'
+    - '@autobazar_odessa'
+    - '@avto_odessa'
+    - '@autobazar_kharkiv'
+    - '@avto_kharkiv'
+    - '@autobazar_lutsk'
+    - '@avto_lutsk'
+    - '@autobazar_rivne'
+    - '@avto_rivne'
+    - '@autobazar_ternopil'
+    - '@avto_ternopil'
+    - '@autobazar_if'
+    - '@avto_ivano_frankivsk'
+    - '@autobazar_uzhhorod'
+    - '@avto_zakarpattia'
+    - '@autobazar_chernivtsi'
+    - '@avto_chernivtsi'
+    - '@autobazar_khmelnytskyi'
+    - '@avto_khmelnitsky'
+    - '@autobazar_vinnytsia'
+    - '@avto_vinnitsa'
+    - '@autobazar_zhytomyr'
+    - '@avto_zhytomyr'
+    - '@autobazar_poltava'
+    - '@avto_poltava'
+    - '@autobazar_cherkasy'
+    - '@avto_cherkasy'
+    - '@autobazar_sumy'
+    - '@avto_sumy'
+    - '@autobazar_chernihiv'
+    - '@avto_chernigov'
+    - '@autobazar_zaporizhzhia'
+    - '@avto_zaporozhye'
+    - '@autobazar_mykolaiv'
+    - '@avto_nikolaev'
+    - '@avtobazar_kr'
+    - '@autobazar_kryvyirih'
+    - '@avto_ua_sale'
+    - '@autoploshadka_ua'
+    - '@car_bazar_ua'
+    - '@cars_ukraine'
+    - '@autorynok_ua'
+    - '@avtorynok_ukraine'
+    - '@kupit_avto_ua'
+    - '@prodazh_avto_ua'
+    - '@avto_do_5000'
+    - '@avto_do_10000'
+    - '@avto_do_3000'
+    - '@avto_do_4000'
+    - '@avto_do_6000'
+    - '@bazar_avto_ua'
+    - '@ukr_autobazar'
+    - '@auto_komissionka_ua'
+    - '@vag_bazar_ua'
+    - '@vag_ukraine'
+    - '@audi_vag_ua'
+    - '@audi_bazar_ua'
+    - '@audi_market_ua'
+    - '@audi_fans_ua'
+    - '@vag_market_ua'
+    - '@audi_ukraine_club'
+    - '@avtorynok_kiev'
+    - '@avtorynok_lviv'
+    - '@avtorynok_dnipro'
+    - '@avtorynok_odessa'
+    - '@avtorynok_kharkiv'
+    - '@avtobarakholka_ua'
+    - '@avtobarakholka_kiev'
+    - '@avtobarakholka_lviv'
+    - '@avto_barakholka_ukr'
+    - '@car_sale_ukraine'
+    - '@autobid_ua'
+    - '@auto_auction_ua'
+    - '@evroblakhy_ua'
+    - '@nerastamozhennye_ua'
+    - '@avto_z_evropy'
+    - '@avto_iz_polshi'
+    - '@avtoprigon_ua'
+    - '@prigon_avto_ua'
+    - '@autopodbor_ukraine'
+    - '@auto_expert_ua'
+    - '@autocheck_ua'
+    - '@hot_cars_ua'
+    - '@top_cars_ua'
+    - '@avto_treyd_ua'
+    - '@avto_diler_ua'
+    - '@avtosale_ukraine'
+    - '@avtoobmen_ua'
+    - '@shvydke_avto_ua'
+    - '@cars_kiev_sale'
+    - '@cars_lviv_sale'
+    - '@cars_dnipro_sale'
+    - '@cars_odessa_sale'
+    - '@cars_kharkiv_sale'
     max_messages_per_channel: 20
   instagram:
     enabled: true
     session_cookie: null
     accounts:
-      - "autopodbor_ua"
-      - "avto_germany_ua"
-      - "audi_hub_ua"
-      - "audi_club_ukraine"
-      - "audi_kyiv"
-      - "vag_service_ua"
-      - "vag_market_ukraine"
-      - "autobazar_ua"
-      - "avtobazar_kiev"
-      - "avtobazar_lviv"
-      - "avtobazar_odessa"
-      - "avtobazar_dnipro"
-      - "avtobazar_kharkiv"
-      - "avto_podbor_ua"
-      - "avto_z_evropy_ua"
-      - "prigon_avto_eu"
-      - "auto_import_ua"
-      - "topcars_ukraine"
-      - "bazar_avto_ua"
-      - "carpoint_ua"
-      - "autotrade_ua"
-      - "cars_kyiv"
-      - "cars_lviv"
-      - "cars_dnipro"
-      - "cars_odessa"
-      - "avto_lutsk"
-      - "avto_rivne"
-      - "avto_ternopil"
-      - "avto_ivano_frankivsk"
-      - "avto_uzhhorod"
-      - "avto_chernivtsi"
-      - "avto_vinnytsia"
-      - "avto_zhytomyr"
-      - "avto_poltava"
-      - "avto_cherkasy"
-      - "avto_sumy"
-      - "avto_chernihiv"
-      - "avto_zaporizhzhia"
-      - "avto_mykolaiv"
-      - "avto_kryvyi_rih"
-      - "autoria_official"
-      - "motor_hub_ua"
-      - "drive_cars_ua"
-      - "prime_auto_ua"
-      - "avtoexpert_ua"
-      - "autocheck_ua"
-      - "auto_baraholka_ua"
-      - "ukr_auto_club"
-      - "vip_auto_ua"
-      - "auto_broker_ua"
-      - "eurocars_ua"
-      - "auto_sale_kyiv"
-      - "auto_sale_lviv"
-      - "auto_sale_odessa"
-      - "auto_sale_dnipro"
-      - "auto_sale_kharkiv"
-      - "auto_bazar_lutsk"
-      - "auto_bazar_rivne"
-      - "auto_bazar_ternopil"
-      - "auto_bazar_vinnytsia"
+    - autopodbor_ua
+    - avto_germany_ua
+    - audi_hub_ua
+    - audi_club_ukraine
+    - audi_kyiv
+    - vag_service_ua
+    - vag_market_ukraine
+    - autobazar_ua
+    - avtobazar_kiev
+    - avtobazar_lviv
+    - avtobazar_odessa
+    - avtobazar_dnipro
+    - avtobazar_kharkiv
+    - avto_podbor_ua
+    - avto_z_evropy_ua
+    - prigon_avto_eu
+    - auto_import_ua
+    - topcars_ukraine
+    - bazar_avto_ua
+    - carpoint_ua
+    - autotrade_ua
+    - cars_kyiv
+    - cars_lviv
+    - cars_dnipro
+    - cars_odessa
+    - avto_lutsk
+    - avto_rivne
+    - avto_ternopil
+    - avto_ivano_frankivsk
+    - avto_uzhhorod
+    - avto_chernivtsi
+    - avto_vinnytsia
+    - avto_zhytomyr
+    - avto_poltava
+    - avto_cherkasy
+    - avto_sumy
+    - avto_chernihiv
+    - avto_zaporizhzhia
+    - avto_mykolaiv
+    - avto_kryvyi_rih
+    - autoria_official
+    - motor_hub_ua
+    - drive_cars_ua
+    - prime_auto_ua
+    - avtoexpert_ua
+    - autocheck_ua
+    - auto_baraholka_ua
+    - ukr_auto_club
+    - vip_auto_ua
+    - auto_broker_ua
+    - eurocars_ua
+    - auto_sale_kyiv
+    - auto_sale_lviv
+    - auto_sale_odessa
+    - auto_sale_dnipro
+    - auto_sale_kharkiv
+    - auto_bazar_lutsk
+    - auto_bazar_rivne
+    - auto_bazar_ternopil
+    - auto_bazar_vinnytsia
     max_posts_per_account: 12
-
 telegram_bot:
-  bot_token: ""
-  chat_id: ""
+  bot_token: ''
+  chat_id: ''
   max_photos_per_album: 10
   rate_limit_delay: 1.2
   send_needs_review: true
-
 runner:
   concurrency_limit: 3
   dry_run: false
