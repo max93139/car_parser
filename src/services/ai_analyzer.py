@@ -29,53 +29,76 @@ def sanitize_markdown_to_telegram_html(text: str) -> str:
     Converts standard Markdown produced by Gemini into Telegram-supported HTML tags.
     Telegram HTML only supports: <b>, <strong>, <i>, <em>, <u>, <ins>, <s>, <strike>,
     <del>, <span class="tg-spoiler">, <tg-spoiler>, <a>, <code>, <pre>, <blockquote>.
+    Ensures all HTML tags are balanced so Telegram API never rejects with HTTP 400.
     """
     if not text:
         return ""
 
     # Remove markdown code block wrappers if model wrapped entire response
-    text = re.sub(r"^```(?:html)?\s*", "", text.strip())
+    text = re.sub(r"^```(?:html|markdown)?\s*", "", text.strip())
     text = re.sub(r"\s*```$", "", text)
 
-    # 1. Temporarily protect already valid HTML tags
-    valid_tags_pattern = r"(</?(?:b|i|u|s|code|pre|a|blockquote)(?:\s+[^>]*)?>)"
-    tokens = re.split(valid_tags_pattern, text, flags=re.IGNORECASE)
-
-    processed_tokens = []
-    for idx, token in enumerate(tokens):
-        # Odd indexes are the matched valid HTML tags
-        if idx % 2 == 1:
-            processed_tokens.append(token)
+    # 1. Line-by-line transformations for headers and lists
+    lines = []
+    for line in text.splitlines():
+        # Header: ## Title -> <b>Title</b>
+        m_hdr = re.match(r"^\s*#{1,6}\s+(.*)$", line)
+        if m_hdr:
+            content = m_hdr.group(1).strip()
+            lines.append(f"<b>{content}</b>")
             continue
+        # Bullet list
+        line = re.sub(r"^\s*[\*\-]\s+", "• ", line)
+        lines.append(line)
+    text = "\n".join(lines)
 
-        # For non-tag text, first escape raw HTML special characters
-        escaped = html.escape(token, quote=False)
+    # 2. Markdown bold, italic, and inline code formatting
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text, flags=re.DOTALL)
+    text = re.sub(r"__(.+?)__", r"<b>\1</b>", text, flags=re.DOTALL)
+    text = re.sub(r"(?<!\w)\*([^\*\n]+?)\*(?!\w)", r"<i>\1</i>", text)
+    text = re.sub(r"(?<!\w)_([^_\n]+?)_(?!\w)", r"<i>\1</i>", text)
+    text = re.sub(r"`([^`\n]+?)`", r"<code>\1</code>", text)
 
-        # Convert markdown headers: ### Header or ## Header -> <b>Header</b>
-        escaped = re.sub(r"^#{1,6}\s*(.+)$", r"<b>\1</b>", escaped, flags=re.MULTILINE)
-
-        # Convert bold markdown: **text** or __text__ -> <b>text</b>
-        escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped, flags=re.DOTALL)
-        escaped = re.sub(r"__(.+?)__", r"<b>\1</b>", escaped, flags=re.DOTALL)
-
-        # Convert italic markdown: *text* or _text_ -> <i>text</i>
-        escaped = re.sub(r"(?<!\w)\*([^\*\n]+?)\*(?!\w)", r"<i>\1</i>", escaped)
-        escaped = re.sub(r"(?<!\w)_([^_\n]+?)_(?!\w)", r"<i>\1</i>", escaped)
-
-        # Convert bullet points `* ` or `- ` at line start to emoji bullet
-        escaped = re.sub(r"^[\*\-]\s+", "• ", escaped, flags=re.MULTILINE)
-
-        processed_tokens.append(escaped)
-
-    result = "".join(processed_tokens)
-
-    # Collapse excessive blank lines
+    # 3. Protect allowed Telegram tags while escaping raw characters and forbidden tags
+    allowed_pattern = r"(</?(?:b|i|u|s|code|pre|blockquote)(?:\s+[^>]*)?>|<a\s+href=[\"'][^\"']*[\"'][^>]*>|</a>|<tg-spoiler>|</tg-spoiler>)"
+    tokens = re.split(allowed_pattern, text, flags=re.IGNORECASE)
+    cleaned_tokens = []
+    for idx, token in enumerate(tokens):
+        if idx % 2 == 1:
+            cleaned_tokens.append(token)
+        else:
+            cleaned_tokens.append(html.escape(token, quote=False))
+    result = "".join(cleaned_tokens)
     result = re.sub(r"\n{3,}", "\n\n", result).strip()
 
-    # Telegram hard limit guard (4096 chars)
+    # 4. Truncate safely and balance all open tags
     suffix = "...\n<i>[Скорочено через ліміт Telegram]</i>"
-    if len(result) > 4000:
-        result = result[: 4000 - len(suffix)] + suffix
+    is_truncated = len(result) > 4000
+    if is_truncated:
+        result = result[: 4000 - len(suffix) - 60]
+
+    # Strip any dangling/broken tag opening at the cut boundary (e.g. '<b' or '<a hr')
+    result = re.sub(r"<[^>]*$", "", result)
+
+    # Balance unclosed tags using a LIFO stack
+    tag_pat = r"</?([a-z]+)(?:\s+[^>]*)?>"
+    stack = []
+    for m in re.finditer(tag_pat, result, flags=re.IGNORECASE):
+        t = m.group(0)
+        name = m.group(1).lower()
+        if t.startswith("</"):
+            if stack and stack[-1] == name:
+                stack.pop()
+            elif name in stack:
+                stack.remove(name)
+        else:
+            stack.append(name)
+
+    for name in reversed(stack):
+        result += f"</{name}>"
+
+    if is_truncated:
+        result += suffix
 
     return result
 
@@ -83,11 +106,14 @@ def sanitize_markdown_to_telegram_html(text: str) -> str:
 def build_gemini_car_prompt(listing: Union[Listing, ListingModel, Dict[str, Any]]) -> str:
     """
     Constructs an expert VAG/Audi technical assessment prompt for Gemini 2.0 Flash.
+    Handles non-standard data types and None values safely.
     """
     def _get(attr: str, default: Any = None) -> Any:
         if isinstance(listing, dict):
-            return listing.get(attr, default)
-        return getattr(listing, attr, default) or default
+            val = listing.get(attr)
+        else:
+            val = getattr(listing, attr, None)
+        return val if val is not None else default
 
     brand = _get("brand", "Audi")
     model = _get("model", "A6")
@@ -95,18 +121,33 @@ def build_gemini_car_prompt(listing: Union[Listing, ListingModel, Dict[str, Any]
     year = _get("year", "не вказано")
     price_val = _get("price")
     price_usd = _get("price_usd")
-    currency = _get("currency", "USD")
+    currency = _get("currency", "USD") or "USD"
+
+    def _fmt_num(val: Any) -> Optional[str]:
+        if val is None:
+            return None
+        try:
+            return f"{float(val):,}"
+        except (ValueError, TypeError):
+            return str(val)
 
     price_str = "не вказано"
-    if price_usd:
-        price_str = f"${float(price_usd):,}"
-        if currency != "USD" and price_val:
-            price_str += f" ({float(price_val):,} {currency})"
-    elif price_val:
-        price_str = f"{float(price_val):,} {currency}"
+    formatted_usd = _fmt_num(price_usd)
+    formatted_val = _fmt_num(price_val)
+    if formatted_usd:
+        price_str = f"${formatted_usd}"
+        if currency != "USD" and formatted_val:
+            price_str += f" ({formatted_val} {currency})"
+    elif formatted_val:
+        price_str = f"{formatted_val} {currency}"
 
     mileage = _get("mileage")
-    mileage_str = f"{int(mileage):,} км" if mileage else "не вказано"
+    mileage_str = "не вказано"
+    if mileage is not None:
+        try:
+            mileage_str = f"{int(mileage):,} км"
+        except (ValueError, TypeError):
+            mileage_str = f"{mileage} км" if not str(mileage).endswith("км") else str(mileage)
 
     engine = _get("engine") or _get("engine_code") or "не вказано"
     fuel_type = _get("fuel_type", "інше")
@@ -176,12 +217,15 @@ class GeminiCarAnalyzer:
         timeout: float = 30.0,
     ) -> None:
         settings = get_settings()
+        gemini_cfg = getattr(settings, "gemini", None)
         self.api_key = (
             api_key
             or getattr(settings, "GEMINI_API_KEY", None)
+            or getattr(gemini_cfg, "api_key", None)
             or os.getenv("GEMINI_API_KEY", "")
         )
-        self.model = model
+        configured_model = getattr(gemini_cfg, "model", None) or DEFAULT_MODEL_NAME
+        self.model = model if model != DEFAULT_MODEL_NAME else configured_model
         self.timeout = timeout
         self._injected_client = client
         self._client: Optional[httpx.AsyncClient] = client
@@ -232,14 +276,19 @@ class GeminiCarAnalyzer:
             )
 
         prompt = build_gemini_car_prompt(listing)
-        return await self._call_gemini_api(prompt, clean_key)
+        should_close = self._injected_client is None
+        try:
+            return await self._call_gemini_api(prompt, clean_key)
+        finally:
+            if should_close:
+                await self.close()
 
     async def _call_gemini_api(self, prompt: str, api_key: str) -> str:
         """
-        Dispatches prompt to Google AI Studio Gemini 2.0 Flash REST endpoint.
+        Dispatches prompt to Google AI Studio Gemini REST endpoint.
         """
         client = await self.get_client()
-        url = f"{GEMINI_API_ENDPOINT}?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={api_key}"
         payload = {
             "contents": [
                 {
@@ -268,7 +317,12 @@ class GeminiCarAnalyzer:
                 if not candidates:
                     return "⚠️ <b>Google Gemini 2.0 Flash не зміг сформувати оцінку для цього авто.</b>"
 
-                parts = candidates[0].get("content", {}).get("parts", [])
+                first_candidate = candidates[0]
+                finish_reason = first_candidate.get("finishReason")
+                if finish_reason == "SAFETY":
+                    return "⚠️ <b>Відповідь заблоковано фільтром безпеки Google AI Studio.</b>"
+
+                parts = first_candidate.get("content", {}).get("parts", [])
                 raw_text = "".join(part.get("text", "") for part in parts).strip()
                 if not raw_text:
                     return "⚠️ <b>Отримано порожню відповідь від моделі аналізу.</b>"
@@ -287,7 +341,7 @@ class GeminiCarAnalyzer:
 
             # 3. Authentication & Key Errors (HTTP 400 / 403)
             if response.status_code in (400, 403):
-                logger.warning("[ai_analyzer] Gemini API auth error: %s %s", response.status_code, response.text)
+                logger.warning("[ai_analyzer] Gemini API auth/request error: %s %s", response.status_code, response.text)
                 return (
                     "⚠️ <b>Помилка доступу до Google Gemini API</b>\n\n"
                     "Перевірте коректність <code>GEMINI_API_KEY</code> у вашому <code>.env</code> файлі. "

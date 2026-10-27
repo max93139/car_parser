@@ -516,7 +516,27 @@ class BotHandler:
             await self.execute_search(chat_id)
             return
 
-        if clean_text in ("/boost", "🚀 Boost пошук", "boost", "🚀 /boost", "/boost пошук", "boost пошук"):
+        first_token = clean_text.split()[0].lower() if clean_text else ""
+        first_cmd = first_token.split("@")[0]
+        if first_cmd == "/boost" or clean_text in ("🚀 Boost пошук", "boost", "🚀 /boost", "/boost пошук", "boost пошук"):
+            tokens = clean_text.split()
+            if len(tokens) > 1 and tokens[1].isdigit():
+                target_id = int(tokens[1])
+                await self.send_message(chat_id, f"🧠 <b>Запускаю ШІ-аналіз авто #{target_id}...</b>")
+                factory = get_session_factory()
+                async with factory() as session:
+                    listing_obj = await get_listing_by_id(session, target_id)
+                if not listing_obj:
+                    await self.send_message(
+                        chat_id,
+                        f"⚠️ <b>Оголошення #{target_id} не знайдено в базі даних</b> або було видалене.",
+                    )
+                    return
+                analyzer = GeminiCarAnalyzer(client=self.client)
+                analysis_text = await analyzer.analyze_listing(listing_obj)
+                await self.send_message(chat_id, analysis_text)
+                return
+
             await self.execute_search(chat_id, is_boost=True)
             return
 

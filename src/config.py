@@ -79,6 +79,11 @@ class TelegramBotConfig(BaseModel):
     send_needs_review: bool = True
 
 
+class GeminiConfig(BaseModel):
+    api_key: str = ""
+    model: str = "gemini-2.0-flash"
+
+
 class RunnerConfig(BaseModel):
     concurrency_limit: int = 3
     dry_run: bool = False
@@ -113,6 +118,7 @@ class Settings(BaseSettings):
     parsers: ParsersConfig = Field(default_factory=ParsersConfig)
     telegram_bot: TelegramBotConfig = Field(default_factory=TelegramBotConfig)
     runner: RunnerConfig = Field(default_factory=RunnerConfig)
+    gemini: GeminiConfig = Field(default_factory=GeminiConfig)
 
     @model_validator(mode="after")
     def sync_env_overrides(self) -> Settings:
@@ -148,8 +154,12 @@ class Settings(BaseSettings):
         gemini_env = os.getenv("GEMINI_API_KEY")
         if gemini_env:
             self.GEMINI_API_KEY = gemini_env.strip()
+            self.gemini.api_key = self.GEMINI_API_KEY
         elif self.GEMINI_API_KEY:
             self.GEMINI_API_KEY = self.GEMINI_API_KEY.strip()
+            self.gemini.api_key = self.GEMINI_API_KEY
+        elif self.gemini.api_key:
+            self.GEMINI_API_KEY = self.gemini.api_key.strip()
 
         return self
 

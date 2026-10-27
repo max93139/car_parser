@@ -251,6 +251,10 @@ class PipelineRunner:
 
         # Step 3: Deduplicate & Persist
         dedup_res = await deduplicator.evaluate(listing, session, persist=True)
+        if dedup_res.listing_id:
+            listing.id = dedup_res.listing_id
+        elif dedup_res.existing_listing_id:
+            listing.id = dedup_res.existing_listing_id
 
         notified = False
         action = dedup_res.action
