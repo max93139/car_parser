@@ -288,7 +288,12 @@ class GeminiCarAnalyzer:
         Dispatches prompt to Google AI Studio Gemini REST endpoint.
         """
         client = await self.get_client()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={api_key}"
+        models_to_try = [self.model]
+        if self.model in ("gemini-2.0-flash", "gemini-2.5-flash"):
+            for alt in ("gemini-3.5-flash", "gemini-flash-latest"):
+                if alt not in models_to_try:
+                    models_to_try.append(alt)
+
         payload = {
             "contents": [
                 {
@@ -304,18 +309,32 @@ class GeminiCarAnalyzer:
         }
 
         try:
-            response = await client.post(
-                url,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
+            response = None
+            used_model = self.model
+            for current_model in models_to_try:
+                used_model = current_model
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                if response.status_code == 200:
+                    break
+                if response.status_code in (404, 503) and current_model != models_to_try[-1]:
+                    logger.warning("[ai_analyzer] Model %s returned %d, trying fallback...", current_model, response.status_code)
+                    continue
+                break
+
+            if response is None:
+                return "❌ <b>Не вдалося виконати запит до сервісу ШІ.</b>"
 
             # 1. Success response
             if response.status_code == 200:
                 data = response.json()
                 candidates = data.get("candidates", [])
                 if not candidates:
-                    return "⚠️ <b>Google Gemini 2.0 Flash не зміг сформувати оцінку для цього авто.</b>"
+                    return f"⚠️ <b>Google Gemini ({used_model}) не зміг сформувати оцінку для цього авто.</b>"
 
                 first_candidate = candidates[0]
                 finish_reason = first_candidate.get("finishReason")
@@ -328,7 +347,7 @@ class GeminiCarAnalyzer:
                     return "⚠️ <b>Отримано порожню відповідь від моделі аналізу.</b>"
 
                 formatted_html = sanitize_markdown_to_telegram_html(raw_text)
-                return f"🧠 <b>Експертний ШІ-аналіз (Gemini 2.0 Flash):</b>\n\n{formatted_html}"
+                return f"🧠 <b>Експертний ШІ-аналіз (Gemini Flash):</b>\n\n{formatted_html}"
 
             # 2. Rate Limit (HTTP 429)
             if response.status_code == 429:
