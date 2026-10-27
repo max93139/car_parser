@@ -218,12 +218,14 @@ class GeminiCarAnalyzer:
     ) -> None:
         settings = get_settings()
         gemini_cfg = getattr(settings, "gemini", None)
-        self.api_key = (
-            api_key
-            or getattr(settings, "GEMINI_API_KEY", None)
-            or getattr(gemini_cfg, "api_key", None)
-            or os.getenv("GEMINI_API_KEY", "")
-        )
+        if api_key is not None:
+            self.api_key = api_key
+        else:
+            self.api_key = (
+                getattr(settings, "GEMINI_API_KEY", None)
+                or getattr(gemini_cfg, "api_key", None)
+                or os.getenv("GEMINI_API_KEY", "")
+            )
         configured_model = getattr(gemini_cfg, "model", None) or DEFAULT_MODEL_NAME
         self.model = model if model != DEFAULT_MODEL_NAME else configured_model
         self.timeout = timeout
@@ -347,7 +349,7 @@ class GeminiCarAnalyzer:
                     return "⚠️ <b>Отримано порожню відповідь від моделі аналізу.</b>"
 
                 formatted_html = sanitize_markdown_to_telegram_html(raw_text)
-                return f"🧠 <b>Експертний ШІ-аналіз (Gemini Flash):</b>\n\n{formatted_html}"
+                return f"🧠 <b>Експертний ШІ-аналіз (Gemini 2.0 Flash):</b>\n\n{formatted_html}"
 
             # 2. Rate Limit (HTTP 429)
             if response.status_code == 429:

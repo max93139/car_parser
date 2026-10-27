@@ -155,11 +155,11 @@ class Settings(BaseSettings):
         if gemini_env:
             self.GEMINI_API_KEY = gemini_env.strip()
             self.gemini.api_key = self.GEMINI_API_KEY
+        elif self.gemini.api_key:
+            self.GEMINI_API_KEY = self.gemini.api_key.strip()
         elif self.GEMINI_API_KEY:
             self.GEMINI_API_KEY = self.GEMINI_API_KEY.strip()
             self.gemini.api_key = self.GEMINI_API_KEY
-        elif self.gemini.api_key:
-            self.GEMINI_API_KEY = self.gemini.api_key.strip()
 
         return self
 
