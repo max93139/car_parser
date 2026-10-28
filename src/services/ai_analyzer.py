@@ -209,6 +209,8 @@ class GeminiCarAnalyzer:
     Asynchronous client for Google Gemini 2.0 Flash AI car evaluation.
     """
 
+    _active_model: Optional[str] = None
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -226,8 +228,12 @@ class GeminiCarAnalyzer:
                 or getattr(gemini_cfg, "api_key", None)
                 or os.getenv("GEMINI_API_KEY", "")
             )
+        if client is not None:
+            GeminiCarAnalyzer._active_model = None
+
         configured_model = getattr(gemini_cfg, "model", None) or DEFAULT_MODEL_NAME
-        self.model = model if model != DEFAULT_MODEL_NAME else configured_model
+        cached_model = getattr(GeminiCarAnalyzer, "_active_model", None)
+        self.model = model if model != DEFAULT_MODEL_NAME else (cached_model or configured_model)
         self.timeout = timeout
         self._injected_client = client
         self._client: Optional[httpx.AsyncClient] = client
@@ -292,7 +298,7 @@ class GeminiCarAnalyzer:
         client = await self.get_client()
         models_to_try = [self.model]
         if self.model in ("gemini-2.0-flash", "gemini-2.5-flash"):
-            for alt in ("gemini-3.5-flash", "gemini-flash-latest"):
+            for alt in ("gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"):
                 if alt not in models_to_try:
                     models_to_try.append(alt)
 
@@ -322,6 +328,8 @@ class GeminiCarAnalyzer:
                     headers={"Content-Type": "application/json"},
                 )
                 if response.status_code == 200:
+                    GeminiCarAnalyzer._active_model = used_model
+                    self.model = used_model
                     break
                 if response.status_code in (404, 503) and current_model != models_to_try[-1]:
                     logger.warning("[ai_analyzer] Model %s returned %d, trying fallback...", current_model, response.status_code)
