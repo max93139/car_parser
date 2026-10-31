@@ -102,9 +102,7 @@ class FilterEngine:
         desc_str = raw_desc or ""
         engine_input = raw_engine or ""
 
-        # ----------------------------------------------------------------------
-        # STAGE 0: Normalization & Preprocessing (Dual-Track)
-        # ----------------------------------------------------------------------
+        # Stage 0: Normalization & Preprocessing (Dual-Track)
         # Pass 0: basic NFKC, zero-width removal, decimal comma standardisation
         norm_title = normalize_text(title_str)
         norm_desc = normalize_text(desc_str)
@@ -120,9 +118,7 @@ class FilterEngine:
         norm_engine_id = normalize_automotive_identifiers(norm_engine)
         full_text_id = f"{norm_title_id} {norm_desc_id} {norm_engine_id}".strip()
 
-        # ----------------------------------------------------------------------
-        # STAGE 1: Negative Context Filtering (Track A)
-        # ----------------------------------------------------------------------
+        # Stage 1: Negative Context Filtering (Track A)
         neg_reason = evaluate_negative_rules(clean_title_sem, clean_desc_sem)
         if neg_reason:
             return FilterResult(
@@ -133,9 +129,7 @@ class FilterEngine:
                 normalized_generation=None,
             )
 
-        # ----------------------------------------------------------------------
-        # STAGE 2: Brand & Model Validation
-        # ----------------------------------------------------------------------
+        # Stage 2: Brand & Model Validation
         is_model_valid, model_rejection_reason = validate_brand_and_model(
             structured_brand=raw_brand,
             structured_model=raw_model,
@@ -151,9 +145,7 @@ class FilterEngine:
                 normalized_generation=None,
             )
 
-        # ----------------------------------------------------------------------
-        # STAGE 3: Generation & Year Validation
-        # ----------------------------------------------------------------------
+        # Stage 3: Generation & Year Validation
         # Year extraction
         detected_year = extract_year(raw_year, full_text_id)
 
@@ -193,9 +185,7 @@ class FilterEngine:
                     normalized_generation=None,
                 )
 
-        # ----------------------------------------------------------------------
-        # STAGE 4: Engine Whitelist / Blacklist Evaluation
-        # ----------------------------------------------------------------------
+        # Stage 4: Engine Whitelist / Blacklist Evaluation
         # Check engine blacklist first
         rej_engine = check_engine_blacklist(full_text_id)
         if rej_engine:
@@ -223,9 +213,7 @@ class FilterEngine:
                 normalized_generation=None,
             )
 
-        # ----------------------------------------------------------------------
-        # STAGE 5: Boundary & Ambiguity Arbitration
-        # ----------------------------------------------------------------------
+        # Stage 5: Boundary & Ambiguity Arbitration
         # Check C5 generation confirmation
         c5_confirmed = is_c5_explicit(full_text_id)
 
@@ -318,9 +306,7 @@ class FilterEngine:
                 normalized_generation=None,
             )
 
-        # ----------------------------------------------------------------------
-        # FINAL PASS DECISION
-        # ----------------------------------------------------------------------
+        # Final pass decision
         return FilterResult(
             status=FilterStatus.PASS,
             confidence=1.0,

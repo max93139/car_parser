@@ -226,7 +226,7 @@ class Listing(BaseModel):
     # Raw audit payload
     raw_data: Dict[str, Any] = Field(default_factory=dict)
 
-    # ----------------- Validators -----------------
+    # Field validators
 
     @field_validator("seller_phone", mode="before")
     @classmethod
@@ -315,7 +315,7 @@ class Listing(BaseModel):
 
         return self
 
-    # ----------------- Computation Helpers -----------------
+    # Computation helpers
 
     @staticmethod
     def compute_canonical_url(source: Union[str, SourceType], url: str, source_id: str) -> str:

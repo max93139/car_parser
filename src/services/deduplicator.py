@@ -99,9 +99,7 @@ class Deduplicator:
 
         now = datetime.now(timezone.utc)
 
-        # -------------------------------------------------------------
-        # LEVEL 1: Exact Source + Source Listing ID Match
-        # -------------------------------------------------------------
+        # Level 1: Exact Source + Source Listing ID Match
         stmt_lvl1 = select(ListingModel).where(
             ListingModel.source_id == listing.source,
             ListingModel.source_listing_id == listing.source_id,
@@ -222,9 +220,7 @@ class Deduplicator:
                 action="UNCHANGED",
             )
 
-        # -------------------------------------------------------------
-        # LEVEL 2: Normalized Canonical URL Match
-        # -------------------------------------------------------------
+        # Level 2: Normalized Canonical URL Match
         canonical_target = listing.canonical_url or listing.url
         stmt_lvl2 = (
             select(ListingModel)
@@ -256,9 +252,7 @@ class Deduplicator:
                 action="DUPLICATE_URL",
             )
 
-        # -------------------------------------------------------------
-        # LEVEL 3: Invariant Content Fingerprint (SHA-256)
-        # -------------------------------------------------------------
+        # Level 3: Invariant Content Fingerprint (SHA-256)
         stmt_lvl3 = (
             select(ListingModel)
             .where(ListingModel.content_fingerprint == listing.content_fingerprint)
@@ -289,9 +283,7 @@ class Deduplicator:
                 action="DUPLICATE_CONTENT",
             )
 
-        # -------------------------------------------------------------
-        # BRAND NEW LISTING: Level 0 (No Duplicates)
-        # -------------------------------------------------------------
+        # Level 0: New listing (no duplicates)
         new_db_id = None
         if persist:
             db_listing = self._build_listing_model(listing)

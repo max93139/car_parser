@@ -23,9 +23,7 @@ import re
 from typing import Optional, Tuple
 
 
-# ==============================================================================
-# Whitelist Engine Patterns
-# ==============================================================================
+# Target whitelist engine patterns
 
 # 1.8T: Turbocharged 1.8 petrol
 RE_TARGET_18T = re.compile(
@@ -57,9 +55,7 @@ RE_TARGET_19TDI = re.compile(
 RE_GENERIC_18 = re.compile(r"\b1\.8(?!\d)\b", re.IGNORECASE)
 
 
-# ==============================================================================
-# Blacklist Engine Patterns
-# ==============================================================================
+# Blacklist engine patterns
 
 RE_REJECTED_ENGINES = {
     "REJECTED_ENGINE_2.5_TDI": re.compile(
