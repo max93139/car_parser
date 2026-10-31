@@ -169,6 +169,20 @@ class TestNotificationTemplates:
         assert "&lt;Turbo&gt;" in caption
         assert "&lt;clean &amp; fresh&gt;" in caption
 
+    def test_caption_sanitizes_mileage_in_location_and_deduplicates_description(self):
+        corrupt_location_listing = {
+            "title": "Audi A4 2002",
+            "year": 2002,
+            "engine": "1.9 TDI",
+            "location": "300 тис. км",
+            "description": "300 тис. км | 300 тис. км | Ручна / Механіка | Ручна / Механіка | Коломия | Коломия",
+        }
+        caption = format_listing_caption(corrupt_location_listing)
+        assert "📍 <b>Місто:</b> Україна" in caption
+        assert "300 тис. км | 300 тис. км" not in caption
+        assert "300 тис. км | Ручна / Механіка | Коломия" in caption
+
+
 
 # ==============================================================================
 # 2. Telegram Notifier Media Strategy & Fallback Tests

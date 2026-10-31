@@ -233,7 +233,13 @@ def format_listing_caption(
     safe_title = html.escape(str(title).strip())
     safe_engine = html.escape(str(engine).strip())
     safe_trans = html.escape(str(transmission).strip())
-    safe_location = html.escape(str(location).strip())
+    
+    raw_loc = str(location or "").strip()
+    if not raw_loc or any(k in raw_loc.lower() for k in ["км", "тис.", "тис км"]) or raw_loc.isdigit():
+        safe_location = "Україна"
+    else:
+        safe_location = html.escape(raw_loc)
+
     safe_source = html.escape(format_source_badge(str(source)))
     safe_url = html.escape(str(url).strip())
 
@@ -310,7 +316,13 @@ def format_listing_caption(
         desc_prefix = "\n\n📝 <b>Опис:</b>\n"
         max_desc_len = remaining_budget - len(desc_prefix) - 5  # Room for "..."
         if max_desc_len > 20:
-            clean_desc = description.strip()
+            raw_d = str(description).strip()
+            if "|" in raw_d:
+                tokens = [t.strip() for t in raw_d.split("|") if t.strip()]
+                clean_desc = " | ".join(dict.fromkeys(tokens))
+            else:
+                clean_desc = raw_d
+
             if len(clean_desc) > max_desc_len:
                 clean_desc = clean_desc[:max_desc_len].rstrip() + "..."
             escaped_desc = html.escape(clean_desc)
