@@ -152,11 +152,18 @@ class AutoRiaParser(BaseParser):
                     price_val = float(nums)
 
         # 4. Characteristics list
-        char_items: List[str] = [
-            li.get_text(" ", strip=True)
-            for li in ticket.select("ul.characteristic li, div.item-char, div.grid-wrapper span, div.grid-wrapper div")
-            if li.get_text(strip=True)
-        ]
+        char_nodes = ticket.select("ul.characteristic li.item-char, div.item-char")
+        if not char_nodes:
+            char_nodes = ticket.select("ul.characteristic li, div.grid-wrapper > div, div.grid-wrapper > span")
+        if not char_nodes:
+            char_nodes = ticket.select("ul.characteristic li, div.grid-wrapper span, div.grid-wrapper div")
+
+        raw_items: List[str] = []
+        for node in char_nodes:
+            txt = node.get_text(" ", strip=True)
+            if txt and txt not in raw_items:
+                raw_items.append(txt)
+        char_items = raw_items
         raw_text_summary = " | ".join(char_items)
 
         # 5. Mileage
@@ -213,15 +220,33 @@ class AutoRiaParser(BaseParser):
 
         # 8. Location / City
         raw_location: Optional[str] = None
-        for c in char_items:
-            if c != raw_mileage and c != raw_engine and c != raw_trans:
-                # Typically city names or region
-                if any(city in c for city in ["Київ", "Львів", "Одеса", "Дніпро", "Харків", "Рівне", "Луцьк", "Вінниця", "обл"]):
-                    raw_location = c
-                    break
-        if not raw_location and len(char_items) >= 2:
-            # Check 2nd item which is commonly city in AUTO.RIA layout
-            raw_location = char_items[1]
+        explicit_loc = ticket.select_one(
+            "li.view-location, div.view-location, .item-char.view-location, "
+            "[data-city-id], [class*='location'], [class*='region']"
+        )
+        if explicit_loc:
+            loc_candidate = explicit_loc.get_text(" ", strip=True)
+            if loc_candidate and not any(k in loc_candidate.lower() for k in ["км", "тис", "дизель", "бензин"]):
+                raw_location = loc_candidate
+
+        if not raw_location:
+            skip_terms = [
+                "км", "тис", "л.", " л", "дизель", "бензин", "газ", "tdi",
+                "механ", "автомат", "ручна", "тіптронік", "варіатор", "робот",
+                "quattro", "привід", "передній", "задній", "повний",
+                "седан", "універсал", "хетчбек", "купе", "avant",
+            ]
+            for c in char_items:
+                c_low = c.lower()
+                if any(k in c_low for k in skip_terms):
+                    continue
+                raw_location = c
+                break
+
+        if raw_location:
+            raw_location = re.sub(r"\s+", " ", raw_location).strip()
+            if any(k in raw_location.lower() for k in ["км", "тис"]):
+                raw_location = None
 
         # 9. Year & Generation
         year_val: Optional[int] = None

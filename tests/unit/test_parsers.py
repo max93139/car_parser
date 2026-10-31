@@ -237,6 +237,34 @@ class TestAutoRiaParser:
         assert "Розбірка" in ad4.title
 
     @pytest.mark.asyncio
+    async def test_nested_char_markup_deduplication_and_location(self):
+        html = """
+        <div id="searchResults">
+            <section class="ticket-item" data-auto-id="998877">
+                <a class="address" href="/uk/auto_audi_a4_998877.html">Audi A4 2002</a>
+                <span data-currency="USD">5 150 $</span>
+                <div class="grid-wrapper">
+                    <div class="item-char"><span>300 тис. км</span></div>
+                    <div class="item-char"><span>Коломия</span></div>
+                    <div class="item-char"><span>Дизель, 1.9 л</span></div>
+                    <div class="item-char"><span>Ручна / Механіка</span></div>
+                </div>
+            </section>
+        </div>
+        """
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get = AsyncMock(return_value=httpx.Response(200, text=html))
+        parser = AutoRiaParser(client=mock_client, max_pages=1, request_delay=0)
+        items = [item async for item in parser.fetch_new_listings()]
+        assert len(items) == 1
+        item = items[0]
+        assert item.mileage == 300000
+        assert item.location == "Коломия"
+        assert item.raw_text.count("300 тис. км") == 1
+        assert item.raw_text.count("Коломия") == 1
+
+
+    @pytest.mark.asyncio
     async def test_handles_empty_search_page(self):
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(return_value=httpx.Response(200, text="<html><body></body></html>"))
